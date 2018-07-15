@@ -1,0 +1,41 @@
+---
+output: html_document
+---
+
+```{r}
+library(magrittr)
+library(googlesheets)
+```
+
+
+Descarregar a planilha `febr-chaves` contendo as chaves de identificação das tabelas dos conjuntos de dados
+publicados no ___febr___.
+
+```{r}
+key <- "18yP9Hpp8oMdbGsf6cVu4vkDv-Dj-j5gjEFgEXN-5H-Q"
+sheets_keys <- try(gs_key(key) %>% gs_read_csv(), TRUE)
+if (class(sheets_keys)[1] == "try-error") {
+  url <- glue::glue("https://docs.google.com/spreadsheets/d/{key}/export?format=csv")
+  tempfile <- tempfile(fileext = "cvs")
+  download.file(url, destfile = tempfile)
+  sheets_keys <- readr::read_csv(tempfile)
+}
+save(sheets_keys, file = "../data/febr-chaves.rda")
+```
+
+
+```{r, eval=FALSE}
+# Run this code chunk only when disk data must be updated!!!
+key <- "18yP9Hpp8oMdbGsf6cVu4vkDv-Dj-j5gjEFgEXN-5H-Q"
+
+dts <- febr::dataset(dataset = 'all')
+obs <- febr::observation(dataset = 'all', variable = "coord_desc", standardization = list(crs = "EPSG:4674"))
+save(dts, file = "data/dts.rda")
+save(obs, file = "data/obs.rda")
+
+# Planilha com siglas e nomes dos estados brasileiros
+estado_id <-
+  gs_key('1bTIcFLpnOefYs_BaegPC59kbF3gEugOXpYpnfyrDsDQ') %>% 
+  gs_read_csv(verbose = FALSE)
+save(estado_id, file = 'data/estado_id.rda')
+```
