@@ -4,9 +4,11 @@ output: html_document
 
 ```{r}
 library(magrittr)
+library(glue)
 library(googlesheets)
+library(rgdal)
+library(gdalUtils)
 ```
-
 
 Descarregar a planilha `febr-chaves` contendo as chaves de identificação das tabelas dos conjuntos de dados
 publicados no ___febr___.
@@ -23,19 +25,51 @@ if (class(sheets_keys)[1] == "try-error") {
 save(sheets_keys, file = "../data/febr-chaves.rda")
 ```
 
+## Tabelas `dataset`
 
-```{r, eval=FALSE}
-# Run this code chunk only when disk data must be updated!!!
-key <- "18yP9Hpp8oMdbGsf6cVu4vkDv-Dj-j5gjEFgEXN-5H-Q"
-
+```{r}
 dts <- febr::dataset(dataset = 'all')
-obs <- febr::observation(dataset = 'all', variable = "coord_desc", standardization = list(crs = "EPSG:4674"))
-save(dts, file = "data/dts.rda")
-save(obs, file = "data/obs.rda")
+save(dts, file = "../data/dts.rda")
+```
 
-# Planilha com siglas e nomes dos estados brasileiros
-estado_id <-
+## Tabelas `observacao`
+
+```{r}
+obs <- febr::observation(
+  dataset = 'all', variable = "coord_descricao", 
+  standardization = list(crs = "EPSG:4674", time.format = "%d-%m-%Y"))
+save(obs, file = "../data/obs.rda")
+```
+
+## Tabelas `camada`
+
+```{r}
+lyr <- febr::layer(
+  dataset = "all", 
+  standardization = list(plus.sign = "remove", transition = "smooth"))
+save(lyr, file = "../data/lyr.rda")
+```
+
+## Estados brasileiros
+
+Descarregar a planilha `febr-estados` contendo as siglas e nomes dos estados brasileiros.
+
+```{r}
+uf <-
   gs_key('1bTIcFLpnOefYs_BaegPC59kbF3gEugOXpYpnfyrDsDQ') %>% 
   gs_read_csv(verbose = FALSE)
-save(estado_id, file = 'data/estado_id.rda')
+save(uf, file = '../data/uf.rda')
 ```
+
+Descarregar arquivo vetorial contendo os limites das unidades federativas brasileiras. A fonte dos dados é o
+Instituto Nacional de Geografia e Estatística.
+
+```{r}
+if (!file.exists("../data/br.shp")) {
+  # http://www.geoservicos.ibge.gov.br/geoserver/wfs?service=wfs&version=1.1.0&request=GetCapabilities
+  dsn <- "WFS:http://www.geoservicos.ibge.gov.br:80/geoserver/wfs"
+  br <- readOGR(dsn = dsn, layer = "CGEO:C02_limite_estadual_2010")
+  raster::shapefile(br, filename = "../data/br.shp")
+}
+```
+
