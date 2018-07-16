@@ -1,1 +1,5 @@
-febr-chaves.rda
+*.dbf
+*.prj
+*.rda
+*.shp
+*.shx
