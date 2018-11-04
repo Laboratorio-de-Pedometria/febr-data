@@ -136,7 +136,6 @@ dev.off()
 Salvar os dados nos formatos CSV e RDA.
 
 ```{r}
-save(camada, file = glue::glue("../data/{Sys.Date()}-febr-camada.rda"))
 write.table(
   camada, file = glue::glue("../data/{Sys.Date()}-febr-camada.csv"), sep = ";", dec = ",", row.names = FALSE)
 ```
