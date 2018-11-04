@@ -1,0 +1,143 @@
+---
+output: html_document
+---
+
+## Tabelas `camada`
+
+Descarregar e pós-processar versão corrente de um conjunto de prioritárias variáveis disponíveis no ___febr___.
+Os dados são disponibilizados ao público usando diferentes formatos.
+
+```{r}
+vars <- c("carbono", "argila", "areia", "silte", "terrafina", "dsi", "ctc", "ph", "ce")
+camada <- febr::layer(
+  dataset = "all",
+  variable = glue::glue("{vars}_"),
+  stack = TRUE,
+  harmonization = list(harmonize = TRUE, level = 2),
+  standardization = list(
+    plus.sign = "remove", lessthan.sign = "remove",
+    lessthan.sign = "remove",
+    repetition = "combine", combine.fun = "mean",
+    transition = "smooth", smoothing.fun = "mean",
+    units = TRUE, round = TRUE))
+```
+
+Corrigir valores fora do intervalo real.
+
+```{r}
+cols <- colnames(camada)
+
+# pH
+ph <- grep("^ph_", cols)
+if (length(ph) >= 1) {
+  ph_idx <- which(camada[, ph] > 1000, arr.ind = TRUE)
+  if (length(ph_idx) >= 1) {
+    camada[, ph][ph_idx] <- camada[, ph][ph_idx] / 100
+  }
+  ph_idx <- which(camada[, ph] > 100, arr.ind = TRUE)
+  if (length(ph_idx) >= 1) {
+    camada[, ph][ph_idx] <- camada[, ph][ph_idx] / 100
+  }
+  ph_idx <- which(camada[, ph] > 14, arr.ind = TRUE)
+  if (length(ph_idx) >= 1) {
+    camada[, ph][ph_idx] <- camada[, ph][ph_idx] / 10
+  }
+}
+
+# Profundidade
+profund <- grep("^profund_", cols)
+profund_idx <- which(camada[, profund] == 9999, arr.ind = TRUE)
+camada[, profund][profund_idx] <- NA_real_
+profund_idx <- which(camada[, profund] == 999, arr.ind = TRUE)
+camada[, profund][profund_idx] <- NA_real_
+
+# Argila
+argila <- grep("^argila_", cols)
+if (length(argila) >= 1) {
+  argila_idx <- which(camada[, argila] > 1000, arr.ind = TRUE)
+  if (length(argila_idx) >= 1) {
+    camada[, argila][argila_idx] <- camada[, argila][argila_idx] / 10
+  }
+}
+
+# Areia
+areia <- grep("^areia", cols)
+if (length(areia) >= 1) {
+  areia_idx <- which(camada[, areia] > 10000, arr.ind = TRUE)
+  if (length(areia_idx) >= 1) {
+    camada[, areia][areia_idx] <- camada[, areia][areia_idx] / 100
+  }
+  areia_idx <- which(camada[, areia] > 1000, arr.ind = TRUE)
+  if (length(areia_idx) >= 1) {
+    camada[, areia][areia_idx] <- camada[, areia][areia_idx] / 10
+  }
+}
+
+# Silte
+silte <- grep("^silte_", cols)
+if (length(silte) >= 1) {
+  silte_idx <- which(camada[, silte] > 1000, arr.ind = TRUE)
+  if (length(silte_idx) >= 1) {
+    camada[, silte][silte_idx] <- camada[, silte][silte_idx] / 10
+  }
+}
+
+# DSI
+dsi <- grep("^dsi_", cols)
+if (length(dsi) >= 1) {
+  dsi_idx <- which(camada[, dsi] > 30, arr.ind = TRUE)
+  if (length(dsi_idx) >= 1) {
+    camada[, dsi][dsi_idx] <- camada[, dsi][dsi_idx] / 100
+  }
+  dsi_idx <- which(camada[, dsi] > 3, arr.ind = TRUE)
+  if (length(dsi_idx) >= 1) {
+    camada[, dsi][dsi_idx] <- camada[, dsi][dsi_idx] / 10
+  }
+}
+```
+
+Pós-processamentos das variáveis prioritárias.
+
+```{r}
+rowMedians <-
+  function (x) {
+    apply(x, MARGIN = 1, median, na.rm = TRUE)
+  }
+camada$carbono <- rowMedians(camada[c("carbono_cromo", "carbono_forno", "carbono_xxx")])
+camada$argila <- rowMedians(dplyr::select(camada, argila_naoh, argila_xxx))
+camada$areia <- rowMedians(dplyr::select(camada, areia_naoh, areia_xxx))
+camada$silte <- rowMedians(dplyr::select(camada, silte_naoh, silte_xxx))
+camada$dsi <- rowMedians(dplyr::select(camada, dsi_cilindro, dsi_xxx))
+camada$ctc <- rowMedians(dplyr::select(camada, ctc_xxx, ctc_soma))
+camada$ph <- rowMedians(dplyr::select(camada, ph_h2o))
+camada$terrafina <- rowMedians(dplyr::select(camada, terrafina_xxx, terrafina_peneira))
+camada$ce <- rowMedians(dplyr::select(camada, ce_pastasat))
+camada[c("argila", "areia", "silte")] <- 
+  camada[c("argila", "areia", "silte")] / rowSums(camada[c("argila", "areia", "silte")]) * 1000
+camada[which(camada$terrafina == 0), vars] <- NA_real_
+camada[which(camada$dsi == 0), c("dsi")] <- NA_real_
+camada <- camada[rowSums(is.na(camada[vars])) < length(vars), ]
+camada <- dplyr::select(
+  camada, 
+  dataset_id, observacao_id, amostra_id, camada_nome, profund_sup, profund_inf,
+  terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce)
+```
+
+Verificar a distribuição empírica dos dados, procurando por insconsistências nos dados.
+
+```{r}
+png(glue::glue("../res/{Sys.Date()}-febr-camada.png"), width = 480 * 3, height = 480 * 3, res = 72 * 3)
+plot(
+  camada[c("carbono", "argila", "areia", "silte", "terrafina", "dsi", "ctc", "ph", "ce")], cex = 0.5,
+  col = "firebrick", main = glue::glue("{Sys.Date()}-febr-camada"))
+dev.off()
+```
+
+Salvar os dados nos formatos CSV e RDA.
+
+```{r}
+save(camada, file = glue::glue("../data/{Sys.Date()}-febr-camada.rda"))
+write.table(
+  camada, file = glue::glue("../data/{Sys.Date()}-febr-camada.csv"), sep = ";", dec = ",", row.names = FALSE)
+```
+
