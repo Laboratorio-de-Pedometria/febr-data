@@ -133,7 +133,7 @@ plot(
 dev.off()
 ```
 
-Salvar os dados nos formatos CSV e RDA.
+Salvar os dados no formato CSV.
 
 ```{r}
 write.table(
