@@ -2,10 +2,90 @@
 output: html_document
 ---
 
-## Tabelas `camada`
+```{r}
+library(magrittr)
+library(dplyr)
+library(googlesheets)
+library(sf)
+library(febr)
+```
 
 Descarregar e pós-processar versão corrente de um conjunto de prioritárias variáveis disponíveis no ___febr___.
 Os dados são disponibilizados ao público usando diferentes formatos.
+
+## Tabelas `observacao`
+
+```{r}
+vars <- "taxon_"
+observacao <- observation(
+  dataset = "all", 
+  variable = vars, 
+  stack = TRUE, 
+  standardization = list(
+    crs =  "EPSG:4674", 
+    time.format = "%d-%m-%Y", 
+    units = FALSE, round = FALSE),
+  harmonization = list(harmonize = TRUE, level = 3))
+```
+
+```{r}
+# colnames(observacao)[grepl("taxon_sibcs", colnames(observacao))]
+# colnames(observacao)[grepl("taxon_st", colnames(observacao))]
+# colnames(observacao)[grepl("taxon_wrb", colnames(observacao))]
+sibcs_tabela <- 
+  "1yJ_XnsJhnhJSfC3WRimfu_3_owXxpfSKaoxCiMD2_Z0" %>% 
+  gs_key %>% 
+  gs_read_csv()
+sibcs_siglas <- sibcs_tabela$campo_codigo
+sibcs_tabela <- as.list(sibcs_tabela$campo_nome)
+names(sibcs_tabela) <- sibcs_siglas
+observacao <- 
+  observacao %>% 
+  mutate(
+    taxon_sibcs = coalesce(
+      taxon_sibcs_2013, taxon_sibcs_2009, taxon_sibcs_2006, taxon_sibcs_2003, taxon_sibcs_1999),
+      # Por enquanto, ignora classificação antiga
+      # taxon_sibcs_19xx, taxon_sibcs_xxx, taxon_sibcs_xxx_1, taxon_sibcs_xxx_2, taxon_sibcs_xxxx),
+    taxon_sibcs = recode(.data$taxon_sibcs, !!!sibcs_tabela),
+    taxon_sibcs = sapply(
+      .data$taxon_sibcs, function (x) strsplit(x, " ")[[1]][1:2] %>% paste(collapse = " ")) %>% as.character,
+    taxon_sibcs = gsub(pattern = "NA NA", NA_character_, .data$taxon_sibcs),
+    taxon_sibcs = toupper(taxon_sibcs)) %>% 
+  select(-starts_with("taxon_sibcs_")) %>% 
+  mutate(
+    taxon_st = coalesce(taxon_st_2010, taxon_st_1999, taxon_st_xxx),
+    taxon_wrb = coalesce(taxon_wrb_2006, taxon_wrb_1998, taxon_wrb_xxx)) %>% 
+  select(-starts_with("taxon_st_")) %>% 
+  select(-starts_with("taxon_wrb_"))
+```
+
+```{r}
+head(observacao)
+```
+
+Verificar distribuição espacial das observações com coordenadas espaciais e salvar figura para divulgação.
+
+```{r}
+tmp <- 
+  observacao %>% 
+  filter(!is.na(coord_x) | !is.na(coord_y)) %>% 
+  st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4674)
+png(glue::glue("../res/{Sys.Date()}-febr-observacao.png"), width = 480 * 3, height = 480 * 3, res = 72 * 3)
+plot(
+  tmp["pais_id"], cex = 0.5, colorkey = FALSE, col = "firebrick", axes = TRUE, 
+  graticule = TRUE, main = glue::glue("{Sys.Date()}-febr-observacao"))
+dev.off()
+```
+
+Salvar os dados no formato CSV.
+
+```{r}
+write.table(
+  observacao, file = glue::glue("../data/{Sys.Date()}-febr-observacao.csv"), sep = ";", dec = ",", 
+  row.names = FALSE)
+```
+
+## Tabelas `camada`
 
 ```{r}
 vars <- c("carbono", "argila", "areia", "silte", "terrafina", "dsi", "ctc", "ph", "ce")
@@ -116,10 +196,10 @@ camada[c("argila", "areia", "silte")] <-
   camada[c("argila", "areia", "silte")] / rowSums(camada[c("argila", "areia", "silte")]) * 1000
 camada[which(camada$terrafina == 0), vars] <- NA_real_
 camada[which(camada$dsi == 0), c("dsi")] <- NA_real_
-camada <- camada[rowSums(is.na(camada[vars])) < length(vars), ]
+# camada <- camada[rowSums(is.na(camada[vars])) < length(vars), ] # filtra observações sem dados
 camada <- dplyr::select(
   camada, 
-  dataset_id, observacao_id, amostra_id, camada_nome, profund_sup, profund_inf,
+  dataset_id, observacao_id, camada_id, amostra_id, camada_nome, profund_sup, profund_inf,
   terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce)
 ```
 
@@ -127,9 +207,10 @@ Verificar a distribuição empírica dos dados, procurando por insconsistências
 
 ```{r}
 png(glue::glue("../res/{Sys.Date()}-febr-camada.png"), width = 480 * 3, height = 480 * 3, res = 72 * 3)
-plot(
-  camada[c("carbono", "argila", "areia", "silte", "terrafina", "dsi", "ctc", "ph", "ce")], cex = 0.5,
-  col = "firebrick", main = glue::glue("{Sys.Date()}-febr-camada"))
+camada %>% 
+  rename(profund = profund_inf) %>%
+  select(profund, carbono, argila, areia, silte, terrafina, dsi, ctc, ph, ce) %>% 
+  plot(cex = 0.5, col = "firebrick", main = glue::glue("{Sys.Date()}-febr-camada"))
 dev.off()
 ```
 
@@ -140,3 +221,11 @@ write.table(
   camada, file = glue::glue("../data/{Sys.Date()}-febr-camada.csv"), sep = ";", dec = ",", row.names = FALSE)
 ```
 
+## Tabelas `observacao` + `camada`
+
+```{r}
+febr <- merge(observacao, camada, by = c("dataset_id", "observacao_id"))
+write.table(
+  febr, file = glue::glue("../data/{Sys.Date()}-febr-superconjunto.csv"), sep = ";", dec = ",", 
+  row.names = FALSE)
+```
