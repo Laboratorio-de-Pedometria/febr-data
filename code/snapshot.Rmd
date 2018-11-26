@@ -70,7 +70,7 @@ tmp <-
   observacao %>% 
   filter(!is.na(coord_x) | !is.na(coord_y)) %>% 
   st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4674)
-png("../res/febr-observacao.png", width = 480 * 3, height = 480 * 3, res = 72 * 3)
+png("../res/febr-observacao.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 plot(
   tmp["pais_id"], cex = 0.5, colorkey = FALSE, col = "firebrick", axes = TRUE, 
   graticule = TRUE, main = glue::glue("{Sys.Date()}-febr-observacao"))
@@ -205,7 +205,7 @@ camada <- dplyr::select(
 Verificar a distribuição empírica dos dados, procurando por insconsistências nos dados.
 
 ```{r}
-png("../res/febr-camada.png", width = 480 * 3, height = 480 * 3, res = 72 * 3)
+png("../res/febr-camada.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 camada %>% 
   rename(profund = profund_inf) %>%
   select(profund, carbono, argila, areia, silte, terrafina, dsi, ctc, ph, ce) %>% 
