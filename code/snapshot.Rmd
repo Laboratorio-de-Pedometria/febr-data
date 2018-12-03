@@ -23,15 +23,29 @@ observacao <- observation(
   stack = TRUE, 
   standardization = list(
     crs =  "EPSG:4674", 
-    time.format = "%d-%m-%Y", 
+    time.format = "%Y-%m-%d", 
     units = FALSE, round = FALSE),
   harmonization = list(harmonize = TRUE, level = 3))
 ```
 
+### Classificação taxonômica
+
+O processamento dos dados de classificação taxonômica segue os seguintes passos:
+
+1. Fusão das colunas `taxon_sibcs_<...>` em uma única coluna `taxon_sibcs` usando `dplyr::coalesce()`, dando
+   prioridade à classificação mais recente. Por enquanto, a classificação antiga (< 1999) é ignorada, pois a
+   nomenclatura utilizada é muito diferente da nomenclatura atual. Nesse caso, observações apenas com a
+   classificação taxonômica antiga do SiBCS ficam sem dados (`NA_character`) na nova coluna `taxon_sibcs`.
+2. Substituição da classificação taxonômica no SiBCS registrada na forma de sigla pelo nome correspondente por
+   extenso usando `dplyr::recode()`.
+3. Eliminação do terceiro e quarto níveis categóricos da classificação taxonômica do SiBCS usando
+   `base::strsplit()`.
+4. Formatação da classificação taxonômica no SiBCS em caixa alta.
+5. Fusão das colunas `taxon_st_<...>` e `taxon_wrb_<...>` em uma única coluna `taxon_st` e `taxon_wrb`, 
+   respectivamente, dando prioridade à classificação mais recente. Diferente da classificação taxonômica no
+   SiBCS, aqui as classificações antigas não são ignoradas.
+
 ```{r}
-# colnames(observacao)[grepl("taxon_sibcs", colnames(observacao))]
-# colnames(observacao)[grepl("taxon_st", colnames(observacao))]
-# colnames(observacao)[grepl("taxon_wrb", colnames(observacao))]
 sibcs_tabela <- 
   "1yJ_XnsJhnhJSfC3WRimfu_3_owXxpfSKaoxCiMD2_Z0" %>% 
   gs_key %>% 
@@ -42,40 +56,80 @@ names(sibcs_tabela) <- sibcs_siglas
 observacao <- 
   observacao %>% 
   mutate(
-    taxon_sibcs = coalesce(
+    taxon_sibcs = dplyr::coalesce(
       taxon_sibcs_2013, taxon_sibcs_2009, taxon_sibcs_2006, taxon_sibcs_2003, taxon_sibcs_1999),
-      # Por enquanto, ignora classificação antiga
       # taxon_sibcs_19xx, taxon_sibcs_xxx, taxon_sibcs_xxx_1, taxon_sibcs_xxx_2, taxon_sibcs_xxxx),
-    taxon_sibcs = recode(.data$taxon_sibcs, !!!sibcs_tabela),
+    taxon_sibcs = dplyr::recode(.data$taxon_sibcs, !!!sibcs_tabela),
     taxon_sibcs = sapply(
       .data$taxon_sibcs, function (x) strsplit(x, " ")[[1]][1:2] %>% paste(collapse = " ")) %>% as.character,
     taxon_sibcs = gsub(pattern = "NA NA", NA_character_, .data$taxon_sibcs),
     taxon_sibcs = toupper(taxon_sibcs)) %>% 
-  select(-starts_with("taxon_sibcs_")) %>% 
   mutate(
     taxon_st = coalesce(taxon_st_2010, taxon_st_1999, taxon_st_xxx),
-    taxon_wrb = coalesce(taxon_wrb_2006, taxon_wrb_1998, taxon_wrb_xxx)) %>% 
-  select(-starts_with("taxon_st_")) %>% 
-  select(-starts_with("taxon_wrb_"))
+    taxon_wrb = coalesce(taxon_wrb_2006, taxon_wrb_1998, taxon_wrb_xxx))
+```
+
+### Organização das colunas
+
+As colunas são organizadas usando `dplyr::select()` de maneira a:
+
+1. Descartar as colunas `taxon_sibcs_<...>`, `taxon_st_<...>` e `taxon_wrb_<...>`, processadas acima e 
+   substituidas pelas colunas `taxon_sibcs`, `taxon_st` e `taxon_wrb`, respectivamente.
+2. Descartar a colunas `coord_sistema`, uma vez que as coordenadas espaciais de todas as observações foram
+   padronizadas para o sistema de referência de coordenadas SIRGAS 2000 (EPSG:4674).
+3. Posicionar as colunas com dados de identificação -- `observacao_id_`, `sisb_id` e `ibge_id` lado-a-lado.
+
+O tipo de dados das colunas também é definido aqui:
+
+1. Os dados da coluna `coord_precisao` são definidos como do tipo real usando `as.numeric()`.
+
+```{r}
+observacao %<>%
+  dplyr::select(
+    dataset_id, observacao_id, sisb_id, ibge_id, observacao_data, coord_x, coord_y, coord_precisao, 
+    coord_fonte, pais_id, estado_id, municipio_id, amostra_tipo, amostra_quanti, amostra_area, taxon_sibcs, 
+    taxon_st, taxon_wrb) %>% 
+  dplyr::mutate(
+    coord_precisao = as.numeric(coord_precisao))
 ```
 
 ```{r}
 head(observacao)
 ```
 
-Verificar distribuição espacial das observações com coordenadas espaciais e salvar figura para divulgação.
+### Figuras
+
+Verificar distribuição espacial das observações com coordenadas espaciais.
 
 ```{r}
-tmp <- 
-  observacao %>% 
+png("../res/febr-observacao-espaco.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+observacao %>% 
   filter(!is.na(coord_x) | !is.na(coord_y)) %>% 
-  st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4674)
-png("../res/febr-observacao.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
-plot(
-  tmp["pais_id"], cex = 0.5, colorkey = FALSE, col = "firebrick", axes = TRUE, 
-  graticule = TRUE, main = glue::glue("{Sys.Date()}-febr-observacao"))
+  st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4674) %>%
+  dplyr::select(pais_id) %>% 
+  plot(
+    cex = 0.5, colorkey = FALSE, col = "firebrick", axes = TRUE, 
+    graticule = TRUE, main = glue::glue("{Sys.Date()}-febr-observacao"))
 dev.off()
 ```
+
+```{r}
+png("../res/febr-observacao-tempo.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+tmp <- 
+  observacao$observacao_data %>%
+  as.Date() %>% 
+  format("%Y") %>% 
+  table()
+barplot(tmp, col = "firebrick", border = "firebrick")
+grid()
+barplot(
+  tmp, col = "firebrick", border = "firebrick", add = TRUE, xlab = "Ano", ylab = "Número de observações",
+  main = glue::glue("{Sys.Date()}-febr-observacao"))
+dev.off()
+```
+
+
+### Salvar dados
 
 Salvar os dados no formato CSV.
 
