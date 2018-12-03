@@ -23,7 +23,7 @@ observacao <- observation(
   stack = TRUE, 
   standardization = list(
     crs =  "EPSG:4674", 
-    time.format = "%Y-%m-%d", 
+    time.format = "%d-%m-%Y", 
     units = FALSE, round = FALSE),
   harmonization = list(harmonize = TRUE, level = 3))
 ```
@@ -108,7 +108,7 @@ observacao %>%
   st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4674) %>%
   dplyr::select(pais_id) %>% 
   plot(
-    cex = 0.5, colorkey = FALSE, col = "firebrick", axes = TRUE, 
+    cex = 0.5, col = "firebrick", axes = TRUE, 
     graticule = TRUE, main = glue::glue("{Sys.Date()}-febr-observacao"))
 dev.off()
 ```
