@@ -10,8 +10,27 @@ library(sf)
 library(febr)
 ```
 
-Descarregar e pós-processar versão corrente de um conjunto de prioritárias variáveis disponíveis no ___febr___.
-Os dados são disponibilizados ao público usando diferentes formatos.
+Descarregar e pós-processar (padronização e harmonização) versão corrente de um conjunto de doze variáveis
+disponíveis no ___febr___. São elas:
+
+* Tabela `observacao`:
+  - Classificação taxonômica pelo Sistema Brasileiro de Classificação do Solo (`taxon_sibcs`)
+  - Classificação taxonômica pelo Soil Taxonomy (`taxon_st`)
+  - Classificação taxonômica pelo World Reference Base for Soil Resources (`taxon_wrb`)
+* Tabela `camada`:
+  - Conteúdo de fração terra fina (< 2 mm) no solo inteiro, em g/kg (`terrafina`)
+  - Conteúdo de carbono orgânico na fração terra fina, em g/kg (`carbono`)
+  - Conteúdo de argila total na fração terra fina, em g/kg (`argila`)
+  - Conteúdo de silte total na fração terra fina, em g/kg (`silte`)
+  - Conteúdo de areia total na fração terra fina, em g/kg (`areia`)
+  - Capacidade de troca de cátions da fração terra fina, em cmol~c~/kg (`ctc`)
+  - pH em água da fração terra fina (`ph`)
+  - Condutividade elétrica de fração terra fina, em mS/cm (`ce`)
+  - Densidade do solo inteiro, em kg/dm^3^ (`dsi`)
+
+A maioria dos passos de padronização e harmonização dos dados estão descritos na página do pacote `febr` para
+o R em https://febr-team.github.io/febr-package/. Os dados são disponibilizados ao público usando o formato 
+universal CSV no repositório do ___febr___ no GitHub em https://github.com/febr-team/febr-data/tree/master/data.
 
 ## Tabelas `observacao`
 
@@ -33,8 +52,8 @@ observacao <- observation(
 O processamento dos dados de classificação taxonômica segue os seguintes passos:
 
 1. Fusão das colunas `taxon_sibcs_<...>` em uma única coluna `taxon_sibcs` usando `dplyr::coalesce()`, dando
-   prioridade à classificação mais recente. Por enquanto, a classificação antiga (< 1999) é ignorada, pois a
-   nomenclatura utilizada é muito diferente da nomenclatura atual. Nesse caso, observações apenas com a
+   prioridade à classificação mais recente. Por enquanto, a classificação antiga (antes de 1999) é ignorada, 
+   pois a nomenclatura utilizada é muito diferente da nomenclatura atual. Nesse caso, observações apenas com a
    classificação taxonômica antiga do SiBCS ficam sem dados (`NA_character`) na nova coluna `taxon_sibcs`.
 2. Substituição da classificação taxonômica no SiBCS registrada na forma de sigla pelo nome correspondente por
    extenso usando `dplyr::recode()`.
@@ -99,7 +118,7 @@ head(observacao)
 
 ### Figuras
 
-Verificar distribuição espacial das observações com coordenadas espaciais.
+Verificar distribuição espacial das observações.
 
 ```{r}
 png("../res/febr-observacao-espaco.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
@@ -112,6 +131,8 @@ observacao %>%
     graticule = TRUE, main = glue::glue("{Sys.Date()}-febr-observacao"))
 dev.off()
 ```
+
+Verificar temporal espacial das observações.
 
 ```{r}
 png("../res/febr-observacao-tempo.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
@@ -128,7 +149,6 @@ barplot(
 dev.off()
 ```
 
-
 ### Salvar dados
 
 Salvar os dados no formato CSV.
@@ -141,7 +161,7 @@ write.table(
 ## Tabelas `camada`
 
 ```{r}
-vars <- c("carbono", "argila", "areia", "silte", "terrafina", "dsi", "ctc", "ph", "ce")
+vars <- c("carbono", "argila", "areia", "silte", "terrafina", "cascalho", "calhaus", "dsi", "ctc", "ph", "ce")
 camada <- febr::layer(
   dataset = "all",
   variable = glue::glue("{vars}_"),
@@ -155,7 +175,20 @@ camada <- febr::layer(
     units = TRUE, round = TRUE))
 ```
 
-Corrigir valores fora do intervalo real.
+### Correção de valores I
+
+Alguns dos conjuntos de dados disponíveis no ___febr___ ainda não passaram pelo processo de validação. Isso 
+significa que os dados descarregados podem conter inconsistências, sejam elas oriundas dos trabalhos originais
+ou de equívocos durante a entrada dos dados nas planilhas eletrônicas. Assim, os dados passam pelos seguintes
+passos de processamento:
+
+1. Valores de pH (`ph_<...>`) são sequencialmente divididos por constantes a fim de que se encontrem no 
+   intervalo de 0 a 14.
+2. Valores de profundidade questionáveis, como 9999 e 999, são substituídos por `NA_real_`.
+3. Valores de conteúdo de argila total, silte total e areia total na fração terra fina superiores a 1000 g/kg 
+   são divididos pelas constantes 100 e/ou 10, conforme a necessidade.
+4. Valores de densidade do solo inteiro superiores a 3 kg/dm^3^ são divididos pelas constantes 100 e/ou 10,
+   conforme a necessidade.
 
 ```{r}
 cols <- colnames(camada)
@@ -229,22 +262,44 @@ if (length(dsi) >= 1) {
 }
 ```
 
-Pós-processamentos das variáveis prioritárias.
+### Fusão de dados
+
+Após a correção dos dados das variáveis prioritárias, faz-se a fusão das colunas dos dados de cada variável
+determinadas usando métodos parcialmente distintos. Isso é feito usando usando `dplyr::coalesce()`.
 
 ```{r}
-rowMedians <-
-  function (x) {
-    apply(x, MARGIN = 1, median, na.rm = TRUE)
-  }
-camada$carbono <- rowMedians(camada[c("carbono_cromo", "carbono_forno", "carbono_xxx")])
-camada$argila <- rowMedians(dplyr::select(camada, argila_naoh, argila_xxx))
-camada$areia <- rowMedians(dplyr::select(camada, areia_naoh, areia_xxx))
-camada$silte <- rowMedians(dplyr::select(camada, silte_naoh, silte_xxx))
-camada$dsi <- rowMedians(dplyr::select(camada, dsi_cilindro, dsi_xxx))
-camada$ctc <- rowMedians(dplyr::select(camada, ctc_xxx, ctc_soma))
-camada$ph <- rowMedians(dplyr::select(camada, ph_h2o))
-camada$terrafina <- rowMedians(dplyr::select(camada, terrafina_xxx, terrafina_peneira))
-camada$ce <- rowMedians(dplyr::select(camada, ce_pastasat))
+camada %<>% 
+  dplyr::mutate(
+    carbono = dplyr::coalesce(carbono_cromo, carbono_xxx, carbono_forno),
+    argila = dplyr::coalesce(argila_naoh, argila_xxx),
+    silte = dplyr::coalesce(silte_naoh, silte_xxx),
+    areia = dplyr::coalesce(areia_naoh, areia_xxx),
+    ctc = dplyr::coalesce(ctc_soma, ctc_xxx),
+    dsi = dplyr::coalesce(dsi_cilindro, dsi_xxx),
+    ph = dplyr::coalesce(ph_h2o),
+    terrafina = dplyr::coalesce(terrafina_peneira, terrafina_xxx),
+    ce = dplyr::coalesce(ce_pastasat),
+    cascalho = dplyr::coalesce(cascalho_peneira, cascalho_xxx),
+    calhaus = dplyr::coalesce(calhaus_peneira, calhaus_xxx)
+  )
+```
+
+
+
+```{r}
+# rowMedians <-
+#   function (x) {
+#     apply(x, MARGIN = 1, median, na.rm = TRUE)
+#   }
+# camada$carbono <- rowMedians(camada[c("carbono_cromo", "carbono_forno", "carbono_xxx")])
+# camada$argila <- rowMedians(dplyr::select(camada, argila_naoh, argila_xxx))
+# camada$areia <- rowMedians(dplyr::select(camada, areia_naoh, areia_xxx))
+# camada$silte <- rowMedians(dplyr::select(camada, silte_naoh, silte_xxx))
+# camada$dsi <- rowMedians(dplyr::select(camada, dsi_cilindro, dsi_xxx))
+# camada$ctc <- rowMedians(dplyr::select(camada, ctc_xxx, ctc_soma))
+# camada$ph <- rowMedians(dplyr::select(camada, ph_h2o))
+# camada$terrafina <- rowMedians(dplyr::select(camada, terrafina_xxx, terrafina_peneira))
+# camada$ce <- rowMedians(dplyr::select(camada, ce_pastasat))
 camada[c("argila", "areia", "silte")] <- 
   camada[c("argila", "areia", "silte")] / rowSums(camada[c("argila", "areia", "silte")]) * 1000
 camada[which(camada$terrafina == 0), vars] <- NA_real_
