@@ -161,7 +161,14 @@ write.table(
 ## Tabelas `camada`
 
 ```{r}
-vars <- c("carbono", "argila", "areia", "silte", "terrafina", "cascalho", "calhaus", "dsi", "ctc", "ph", "ce")
+vars <- c(
+  "carbono",
+  "argila", "areia", "areiagrossa", "areiafina", "silte",
+  "terrafina", "cascalho", "calhaus",
+  "dsi",
+  "ctc",
+  "ph",
+  "ce")
 camada <- febr::layer(
   dataset = "all",
   variable = glue::glue("{vars}_"),
@@ -274,37 +281,63 @@ camada %<>%
     argila = dplyr::coalesce(argila_naoh, argila_xxx),
     silte = dplyr::coalesce(silte_naoh, silte_xxx),
     areia = dplyr::coalesce(areia_naoh, areia_xxx),
+    areiagrossa = dplyr::coalesce(areiagrossa_naoh, areiagrossa_xxx),
+    areiafina = dplyr::coalesce(areiafina_naoh, areiafina_xxx),
     ctc = dplyr::coalesce(ctc_soma, ctc_xxx),
     dsi = dplyr::coalesce(dsi_cilindro, dsi_xxx),
     ph = dplyr::coalesce(ph_h2o),
     terrafina = dplyr::coalesce(terrafina_peneira, terrafina_xxx),
     ce = dplyr::coalesce(ce_pastasat),
-    cascalho = dplyr::coalesce(cascalho_peneira, cascalho_xxx),
-    calhaus = dplyr::coalesce(calhaus_peneira, calhaus_xxx)
-  )
+    cascalho = dplyr::coalesce(cascalho_peneira, cascalho_olho, cascalho_xxx),
+    calhau = dplyr::coalesce(calhaus_peneira, calhaus_xxx)
+  ) %T>% 
+  print()
 ```
 
+### Correção de valores II
 
+A segunda etapa do processamento destinada à correção dos dados das variáveis prioritárias consiste dos 
+seguintes passos:
+
+1. Na falta de uma das três frações granulométricas finas -- `argila`, `silte` e `areia` --, calcula-se seu
+   valor como sendo a diferença entre 1000 g/kg e a soma das duas outras frações granulométricas. Isso é mais
+   comum no caso do silte. Na falta dos dados do conteúdo de areia total, primeiro se usa (quando disponível) 
+   os dados do conteúdo de areia grossa + areia fina.
+3. 
 
 ```{r}
-# rowMedians <-
-#   function (x) {
-#     apply(x, MARGIN = 1, median, na.rm = TRUE)
-#   }
-# camada$carbono <- rowMedians(camada[c("carbono_cromo", "carbono_forno", "carbono_xxx")])
-# camada$argila <- rowMedians(dplyr::select(camada, argila_naoh, argila_xxx))
-# camada$areia <- rowMedians(dplyr::select(camada, areia_naoh, areia_xxx))
-# camada$silte <- rowMedians(dplyr::select(camada, silte_naoh, silte_xxx))
-# camada$dsi <- rowMedians(dplyr::select(camada, dsi_cilindro, dsi_xxx))
-# camada$ctc <- rowMedians(dplyr::select(camada, ctc_xxx, ctc_soma))
-# camada$ph <- rowMedians(dplyr::select(camada, ph_h2o))
-# camada$terrafina <- rowMedians(dplyr::select(camada, terrafina_xxx, terrafina_peneira))
-# camada$ce <- rowMedians(dplyr::select(camada, ce_pastasat))
-camada[c("argila", "areia", "silte")] <- 
-  camada[c("argila", "areia", "silte")] / rowSums(camada[c("argila", "areia", "silte")]) * 1000
-camada[which(camada$terrafina == 0), vars] <- NA_real_
-camada[which(camada$dsi == 0), c("dsi")] <- NA_real_
-# camada <- camada[rowSums(is.na(camada[vars])) < length(vars), ] # filtra observações sem dados
+camada %>% 
+  dplyr::mutate(
+    argila_in = !is.na(argila),
+    silte_in = !is.na(silte),
+    areia_in = !is.na(areia),
+    dtp = argila_in + silte_in + areia_in,
+    argila = ifelse(dtp == 2 & !argila_in, 1000 - areia - silte, argila),
+    silte = ifelse(dtp == 2 & !silte_in, 1000 - argila - areia, silte),
+    areia = ifelse(!argila_in, areiagrossa + areiafina, areia),
+    areia_in = !is.na(areia),
+    areia = ifelse(dtp == 2 & !areia_in, 1000 - argila - silte, areia),
+    terrafina_in = !is.na(terrafina),
+    cascalho_in = !is.na(cascalho),
+    calhau_in = !is.na(calhau),
+    terrafina = ifelse(!terrafina_in & cascalho_in & calhau_in, 1000 - cascalho - calhau, terrafina),
+    terrafina = ifelse(!terrafina_in & cascalho_in, 1000 - cascalho, terrafina),
+    terrafina = ifelse(!terrafina_in & calhau_in, 1000 - calhau, terrafina),
+    terrafina = ifelse(!terrafina_in & !cascalho_in & !calhau_in, 1000, terrafina),
+    dtp = areia + argila + silte,
+    argila = round((argila / dtp) * 1000),
+    silte = round((silte / dtp) * 1000),
+    areia = round((areia / dtp) * 1000),
+    dtp = areia + argila + silte
+  ) %>% 
+  filter(dtp != 1000) %>% 
+  select(dataset_id, observacao_id, camada_nome, areia, argila, silte, dtp)
+
+
+
+
+
+
 camada <- dplyr::select(
   camada, 
   dataset_id, observacao_id, camada_id, amostra_id, camada_nome, profund_sup, profund_inf,
