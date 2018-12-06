@@ -182,12 +182,9 @@ camada <- febr::layer(
     units = TRUE, round = TRUE))
 ```
 
-### Correção de valores I
+### Processamento dos dados
 
-Alguns dos conjuntos de dados disponíveis no ___febr___ ainda não passaram pelo processo de validação. Isso 
-significa que os dados descarregados podem conter inconsistências, sejam elas oriundas dos trabalhos originais
-ou de equívocos durante a entrada dos dados nas planilhas eletrônicas. Assim, os dados passam pelos seguintes
-passos de processamento:
+O processamento dos dados das variáveis prioritárias das tabelas `camada` segue os seguintes passos:
 
 1. Valores de pH (`ph_<...>`) são sequencialmente divididos por constantes a fim de que se encontrem no 
    intervalo de 0 a 14.
@@ -269,10 +266,8 @@ if (length(dsi) >= 1) {
 }
 ```
 
-### Fusão de dados
-
-Após a correção dos dados das variáveis prioritárias, faz-se a fusão das colunas dos dados de cada variável
-determinadas usando métodos parcialmente distintos. Isso é feito usando usando `dplyr::coalesce()`.
+Em seguida, as colunas dos dados de cada variável prioritária determinadas usando métodos parcialmente
+distintos são fundidas usando usando `dplyr::coalesce()`.
 
 ```{r}
 camada %<>% 
@@ -294,16 +289,11 @@ camada %<>%
   print()
 ```
 
-### Correção de valores II
-
-A segunda etapa do processamento destinada à correção dos dados das variáveis prioritárias consiste dos 
-seguintes passos:
-
-1. Na falta de uma das três frações granulométricas finas -- `argila`, `silte` e `areia` --, calcula-se seu
-   valor como sendo a diferença entre 1000 g/kg e a soma das duas outras frações granulométricas. Isso é mais
-   comum no caso do silte. Na falta dos dados do conteúdo de areia total, primeiro se usa (quando disponível) 
-   os dados do conteúdo de areia grossa + areia fina.
-3. 
+Após a fusão das colunas com dados da mesma variável, faz-se ajustes nos dados das frações granulométricas. 
+Primeiro, na falta de uma das três frações granulométricas finas -- `argila`, `silte` e `areia` --, calcula-se
+seu valor como sendo a diferença entre 1000 g/kg e a soma das duas outras frações granulométricas. Isso é mais
+comum no caso do silte. Na falta dos dados do conteúdo de areia total, primeiro se usa (quando disponível) os
+dados do conteúdo de areia grossa + areia fina.
 
 ```{r}
 camada %>% 
@@ -333,15 +323,10 @@ camada %>%
   filter(dtp != 1000) %>% 
   select(dataset_id, observacao_id, camada_nome, areia, argila, silte, dtp)
 
-
-
-
-
-
-camada <- dplyr::select(
-  camada, 
-  dataset_id, observacao_id, camada_id, amostra_id, camada_nome, profund_sup, profund_inf,
-  terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce)
+# camada <- dplyr::select(
+#   camada, 
+#   dataset_id, observacao_id, camada_id, amostra_id, camada_nome, profund_sup, profund_inf,
+#   terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce)
 ```
 
 Verificar a distribuição empírica dos dados, procurando por insconsistências nos dados.
