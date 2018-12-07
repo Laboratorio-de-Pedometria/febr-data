@@ -175,10 +175,14 @@ camada <- febr::layer(
   stack = TRUE,
   harmonization = list(harmonize = TRUE, level = 2),
   standardization = list(
-    plus.sign = "remove", lessthan.sign = "remove",
+    plus.sign = "add",
+    plus.depth = 20,
     lessthan.sign = "remove",
-    repetition = "combine", combine.fun = "mean",
-    transition = "smooth", smoothing.fun = "mean",
+    # lessthan.frac = 0.5,
+    repetition = "keep", 
+    # combine.fun = "mean",
+    transition = "smooth",
+    smoothing.fun = "mean",
     units = TRUE, round = TRUE))
 ```
 
@@ -290,13 +294,20 @@ camada %<>%
 ```
 
 Após a fusão das colunas com dados da mesma variável, faz-se ajustes nos dados das frações granulométricas. 
-Primeiro, na falta de uma das três frações granulométricas finas -- `argila`, `silte` e `areia` --, calcula-se
-seu valor como sendo a diferença entre 1000 g/kg e a soma das duas outras frações granulométricas. Isso é mais
-comum no caso do silte. Na falta dos dados do conteúdo de areia total, primeiro se usa (quando disponível) os
-dados do conteúdo de areia grossa + areia fina.
+Primeiro, na falta de uma das duas frações granulométricas finas, `argila` ou `silte`, calcula-se seu valor 
+como sendo a diferença entre 1000 g/kg e a soma das duas outras frações granulométricas. Na falta dos dados do
+conteúdo de areia total -- `areia`, primeiro se usa (quando disponível) a soma dos dados do conteúdo de areia
+grossa -- `areiagrossa` -- e areia fina `areiafina`. Caso não estejam disponíveis, então se usa a estratégia 
+anterior. A seguir, verifica-se se a soma dos valores inteiros das três frações é igual a 1000 g/kg. Caso não 
+seja -- a diferença geralmente é de 1 g/kg para menos ou para mais --, então altera-se os dados do conteúdo de
+silte total de maneira que a soma seja igual a 1000 g/kg. Finalmente, faz-se o processamento dos dados das
+frações granulométricas grossas calhau -- `calhau` --, cascalho -- `cascalho` -- e terra fina -- `terrafina`.
+na ausência da última, utiliza-se as demais para sua estimativa. Caso todas as frações estejam faltando, então
+assume-se que o conteúdo da fração terra fina seja igual a 1000 g/kg. Isso porque é comum os trabalhos omitirem
+o conteúdo de terra fina quando a mesma corresponde a totalidade do solo.
 
 ```{r}
-camada %>% 
+camada %<>% 
   dplyr::mutate(
     argila_in = !is.na(argila),
     silte_in = !is.na(silte),
@@ -307,27 +318,54 @@ camada %>%
     areia = ifelse(!argila_in, areiagrossa + areiafina, areia),
     areia_in = !is.na(areia),
     areia = ifelse(dtp == 2 & !areia_in, 1000 - argila - silte, areia),
+    dtp = areia + argila + silte,
+    argila = round((argila / dtp) * 1000),
+    silte = round((silte / dtp) * 1000),
+    areia = round((areia / dtp) * 1000),
+    dtp = areia + argila + silte,
+    silte = ifelse(dtp != 1000, 1000 - areia - argila, silte),
     terrafina_in = !is.na(terrafina),
     cascalho_in = !is.na(cascalho),
     calhau_in = !is.na(calhau),
     terrafina = ifelse(!terrafina_in & cascalho_in & calhau_in, 1000 - cascalho - calhau, terrafina),
     terrafina = ifelse(!terrafina_in & cascalho_in, 1000 - cascalho, terrafina),
     terrafina = ifelse(!terrafina_in & calhau_in, 1000 - calhau, terrafina),
-    terrafina = ifelse(!terrafina_in & !cascalho_in & !calhau_in, 1000, terrafina),
-    dtp = areia + argila + silte,
-    argila = round((argila / dtp) * 1000),
-    silte = round((silte / dtp) * 1000),
-    areia = round((areia / dtp) * 1000),
-    dtp = areia + argila + silte
-  ) %>% 
-  filter(dtp != 1000) %>% 
-  select(dataset_id, observacao_id, camada_nome, areia, argila, silte, dtp)
+    terrafina = ifelse(!terrafina_in & !cascalho_in & !calhau_in, 1000, terrafina) %>% round()
+  )
+```
 
+A última etapa de processamento lida com os dados da profundidade do solo, especificamente, com as camadas
+compostas por material orgânico. Em geral, o registro dessas camadas é realizado fixando o limite inferior como
+sendo igual a zero. Isso gera uma sequência invertida de valores de profundidade. Por exemplo, uma camada com 
+profundidade de 3--0 cm representa uma camada orgânica de três centímetros de espessura na superfície do solo. 
+Em alguns casos a profundidade superior pode ser negativa, por exemplo, -3--0 cm. O processamento desses dados
+consiste em somar o valor da maior (menor, quando negativa) profundidade superior a todos os valores de 
+profundidade daquela observação.
+
+```{r}
+camada %>% 
+  dplyr::mutate(
+    profund_sup = abs(profund_sup),
+    profund_inf = abs(profund_inf)
+  ) %>% 
+  dplyr::filter(profund_sup > profund_inf & dataset_id != "ctb0032") %>%
+  dplyr::select(dataset_id, observacao_id, camada_nome, profund_sup, profund_inf, argila)
+  # dplyr::mutate(profund_sup = round(profund_sup)) %>% 
+  
+```
+
+```{r}
+febr::goto("ctb0646")
+```
+
+
+```{r}
 # camada <- dplyr::select(
 #   camada, 
 #   dataset_id, observacao_id, camada_id, amostra_id, camada_nome, profund_sup, profund_inf,
 #   terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce)
 ```
+
 
 Verificar a distribuição empírica dos dados, procurando por insconsistências nos dados.
 
