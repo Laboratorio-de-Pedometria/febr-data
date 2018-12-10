@@ -179,8 +179,8 @@ camada <- febr::layer(
     plus.depth = 20,
     lessthan.sign = "remove",
     # lessthan.frac = 0.5,
-    repetition = "keep", 
-    # combine.fun = "mean",
+    repetition = "combine", 
+    combine.fun = "mean",
     transition = "smooth",
     smoothing.fun = "mean",
     units = TRUE, round = TRUE))
@@ -219,42 +219,42 @@ if (length(ph) >= 1) {
 }
 
 # Profundidade
-profund <- grep("^profund_", cols)
-profund_idx <- which(camada[, profund] == 9999, arr.ind = TRUE)
-camada[, profund][profund_idx] <- NA_real_
-profund_idx <- which(camada[, profund] == 999, arr.ind = TRUE)
-camada[, profund][profund_idx] <- NA_real_
+# profund <- grep("^profund_", cols)
+# profund_idx <- which(camada[, profund] == 9999, arr.ind = TRUE)
+# camada[, profund][profund_idx] <- NA_real_
+# profund_idx <- which(camada[, profund] == 999, arr.ind = TRUE)
+# camada[, profund][profund_idx] <- NA_real_
 
 # Argila
-argila <- grep("^argila_", cols)
-if (length(argila) >= 1) {
-  argila_idx <- which(camada[, argila] > 1000, arr.ind = TRUE)
-  if (length(argila_idx) >= 1) {
-    camada[, argila][argila_idx] <- camada[, argila][argila_idx] / 10
-  }
-}
+# argila <- grep("^argila_", cols)
+# if (length(argila) >= 1) {
+#   argila_idx <- which(camada[, argila] > 1000, arr.ind = TRUE)
+#   if (length(argila_idx) >= 1) {
+#     camada[, argila][argila_idx] <- camada[, argila][argila_idx] / 10
+#   }
+# }
 
 # Areia
-areia <- grep("^areia", cols)
-if (length(areia) >= 1) {
-  areia_idx <- which(camada[, areia] > 10000, arr.ind = TRUE)
-  if (length(areia_idx) >= 1) {
-    camada[, areia][areia_idx] <- camada[, areia][areia_idx] / 100
-  }
-  areia_idx <- which(camada[, areia] > 1000, arr.ind = TRUE)
-  if (length(areia_idx) >= 1) {
-    camada[, areia][areia_idx] <- camada[, areia][areia_idx] / 10
-  }
-}
+# areia <- grep("^areia", cols)
+# if (length(areia) >= 1) {
+#   areia_idx <- which(camada[, areia] > 10000, arr.ind = TRUE)
+#   if (length(areia_idx) >= 1) {
+#     camada[, areia][areia_idx] <- camada[, areia][areia_idx] / 100
+#   }
+#   areia_idx <- which(camada[, areia] > 1000, arr.ind = TRUE)
+#   if (length(areia_idx) >= 1) {
+#     camada[, areia][areia_idx] <- camada[, areia][areia_idx] / 10
+#   }
+# }
 
 # Silte
-silte <- grep("^silte_", cols)
-if (length(silte) >= 1) {
-  silte_idx <- which(camada[, silte] > 1000, arr.ind = TRUE)
-  if (length(silte_idx) >= 1) {
-    camada[, silte][silte_idx] <- camada[, silte][silte_idx] / 10
-  }
-}
+# silte <- grep("^silte_", cols)
+# if (length(silte) >= 1) {
+#   silte_idx <- which(camada[, silte] > 1000, arr.ind = TRUE)
+#   if (length(silte_idx) >= 1) {
+#     camada[, silte][silte_idx] <- camada[, silte][silte_idx] / 10
+#   }
+# }
 
 # DSI
 dsi <- grep("^dsi_", cols)
@@ -307,7 +307,7 @@ assume-se que o conteúdo da fração terra fina seja igual a 1000 g/kg. Isso po
 o conteúdo de terra fina quando a mesma corresponde a totalidade do solo.
 
 ```{r}
-camada %<>% 
+camada %<>%
   dplyr::mutate(
     argila_in = !is.na(argila),
     silte_in = !is.na(silte),
@@ -337,43 +337,52 @@ camada %<>%
 A última etapa de processamento lida com os dados da profundidade do solo, especificamente, com as camadas
 compostas por material orgânico. Em geral, o registro dessas camadas é realizado fixando o limite inferior como
 sendo igual a zero. Isso gera uma sequência invertida de valores de profundidade. Por exemplo, uma camada com 
-profundidade de 3--0 cm representa uma camada orgânica de três centímetros de espessura na superfície do solo. 
-Em alguns casos a profundidade superior pode ser negativa, por exemplo, -3--0 cm. O processamento desses dados
-consiste em somar o valor da maior (menor, quando negativa) profundidade superior a todos os valores de 
-profundidade daquela observação.
+profundidade de 3--0 cm representa uma camada orgânica de três centímetros de espessura acima das camadas de
+material mineral do solo. Em alguns casos a profundidade superior pode ser negativa, por exemplo, -3--0 cm. O
+processamento desses dados consiste em ajustar a profundidade superior do solo a profundidade superior da 
+camada de material orgânico do solo, definida assim como sendo igual a zero centímetros de profundidade.
 
 ```{r}
-camada %>% 
+correct_depth <-
+  function (profund.sup, profund.inf) {
+    res <- as.matrix(data.frame(profund.sup, profund.inf))
+    if (any(profund.inf < profund.sup, na.rm = TRUE)) {
+      id <- which(profund.inf < profund.sup)
+      plus_depth <- max(res[id, 1])
+      res[id,  1:2] <- abs(res[id,  1:2] - plus_depth)
+      res[-id, 1:2] <- abs(res[-id, 1:2] + plus_depth)
+    }
+    as.data.frame(res)
+  }
+camada %<>% 
   dplyr::mutate(
-    profund_sup = abs(profund_sup),
-    profund_inf = abs(profund_inf)
+    profund_sup = ifelse(is.na(profund_inf), NA_real_, abs(profund_sup)),
+    profund_inf = ifelse(is.na(profund_sup), NA_real_, abs(profund_inf))
   ) %>% 
-  dplyr::filter(profund_sup > profund_inf & dataset_id != "ctb0032") %>%
-  dplyr::select(dataset_id, observacao_id, camada_nome, profund_sup, profund_inf, argila)
-  # dplyr::mutate(profund_sup = round(profund_sup)) %>% 
-  
+  dplyr::group_by(dataset_id, observacao_id) %>%
+  dplyr::mutate(
+    profund.sup = correct_depth(profund.sup = profund_sup, profund.inf = profund_inf)$profund.sup,
+    profund.inf = correct_depth(profund.sup = profund_sup, profund.inf = profund_inf)$profund.inf,
+    profund_sup = profund.sup,
+    profund_inf = profund.inf
+  ) %>% 
+  dplyr::ungroup()
 ```
 
 ```{r}
-febr::goto("ctb0646")
+camada %<>% 
+  dplyr::select(
+    dataset_id, observacao_id, camada_id, amostra_id, camada_nome, profund_sup, profund_inf,
+    terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce)
 ```
-
-
-```{r}
-# camada <- dplyr::select(
-#   camada, 
-#   dataset_id, observacao_id, camada_id, amostra_id, camada_nome, profund_sup, profund_inf,
-#   terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce)
-```
-
 
 Verificar a distribuição empírica dos dados, procurando por insconsistências nos dados.
 
 ```{r}
 png("../res/febr-camada.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 camada %>% 
-  rename(profund = profund_inf) %>%
-  select(profund, carbono, argila, areia, silte, terrafina, dsi, ctc, ph, ce) %>% 
+  dplyr::rename(profund = profund_inf) %>%
+  dplyr::select(profund, carbono, argila, areia, silte, terrafina, dsi, ctc, ph, ce) %>% 
   plot(cex = 0.5, col = "firebrick", main = glue::glue("{Sys.Date()}-febr-camada"))
 dev.off()
 ```
