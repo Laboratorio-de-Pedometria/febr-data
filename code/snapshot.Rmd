@@ -190,86 +190,6 @@ camada <- febr::layer(
 
 O processamento dos dados das variáveis prioritárias das tabelas `camada` segue os seguintes passos:
 
-1. Valores de pH (`ph_<...>`) são sequencialmente divididos por constantes a fim de que se encontrem no 
-   intervalo de 0 a 14.
-2. Valores de profundidade questionáveis, como 9999 e 999, são substituídos por `NA_real_`.
-3. Valores de conteúdo de argila total, silte total e areia total na fração terra fina superiores a 1000 g/kg 
-   são divididos pelas constantes 100 e/ou 10, conforme a necessidade.
-4. Valores de densidade do solo inteiro superiores a 3 kg/dm^3^ são divididos pelas constantes 100 e/ou 10,
-   conforme a necessidade.
-
-```{r}
-cols <- colnames(camada)
-
-# pH
-ph <- grep("^ph_", cols)
-if (length(ph) >= 1) {
-  ph_idx <- which(camada[, ph] > 1000, arr.ind = TRUE)
-  if (length(ph_idx) >= 1) {
-    camada[, ph][ph_idx] <- camada[, ph][ph_idx] / 100
-  }
-  ph_idx <- which(camada[, ph] > 100, arr.ind = TRUE)
-  if (length(ph_idx) >= 1) {
-    camada[, ph][ph_idx] <- camada[, ph][ph_idx] / 100
-  }
-  ph_idx <- which(camada[, ph] > 14, arr.ind = TRUE)
-  if (length(ph_idx) >= 1) {
-    camada[, ph][ph_idx] <- camada[, ph][ph_idx] / 10
-  }
-}
-
-# Profundidade
-# profund <- grep("^profund_", cols)
-# profund_idx <- which(camada[, profund] == 9999, arr.ind = TRUE)
-# camada[, profund][profund_idx] <- NA_real_
-# profund_idx <- which(camada[, profund] == 999, arr.ind = TRUE)
-# camada[, profund][profund_idx] <- NA_real_
-
-# Argila
-# argila <- grep("^argila_", cols)
-# if (length(argila) >= 1) {
-#   argila_idx <- which(camada[, argila] > 1000, arr.ind = TRUE)
-#   if (length(argila_idx) >= 1) {
-#     camada[, argila][argila_idx] <- camada[, argila][argila_idx] / 10
-#   }
-# }
-
-# Areia
-# areia <- grep("^areia", cols)
-# if (length(areia) >= 1) {
-#   areia_idx <- which(camada[, areia] > 10000, arr.ind = TRUE)
-#   if (length(areia_idx) >= 1) {
-#     camada[, areia][areia_idx] <- camada[, areia][areia_idx] / 100
-#   }
-#   areia_idx <- which(camada[, areia] > 1000, arr.ind = TRUE)
-#   if (length(areia_idx) >= 1) {
-#     camada[, areia][areia_idx] <- camada[, areia][areia_idx] / 10
-#   }
-# }
-
-# Silte
-# silte <- grep("^silte_", cols)
-# if (length(silte) >= 1) {
-#   silte_idx <- which(camada[, silte] > 1000, arr.ind = TRUE)
-#   if (length(silte_idx) >= 1) {
-#     camada[, silte][silte_idx] <- camada[, silte][silte_idx] / 10
-#   }
-# }
-
-# DSI
-dsi <- grep("^dsi_", cols)
-if (length(dsi) >= 1) {
-  dsi_idx <- which(camada[, dsi] > 30, arr.ind = TRUE)
-  if (length(dsi_idx) >= 1) {
-    camada[, dsi][dsi_idx] <- camada[, dsi][dsi_idx] / 100
-  }
-  dsi_idx <- which(camada[, dsi] > 3, arr.ind = TRUE)
-  if (length(dsi_idx) >= 1) {
-    camada[, dsi][dsi_idx] <- camada[, dsi][dsi_idx] / 10
-  }
-}
-```
-
 Em seguida, as colunas dos dados de cada variável prioritária determinadas usando métodos parcialmente
 distintos são fundidas usando usando `dplyr::coalesce()`.
 
@@ -307,42 +227,6 @@ assume-se que o conteúdo da fração terra fina seja igual a 1000 g/kg. Isso po
 o conteúdo de terra fina quando a mesma corresponde a totalidade do solo.
 
 ```{r}
-camada %<>%
-  dplyr::mutate(
-    argila_in = !is.na(argila),
-    silte_in = !is.na(silte),
-    areia_in = !is.na(areia),
-    dtp = argila_in + silte_in + areia_in,
-    argila = ifelse(dtp == 2 & !argila_in, 1000 - areia - silte, argila),
-    silte = ifelse(dtp == 2 & !silte_in, 1000 - argila - areia, silte),
-    areia = ifelse(!argila_in, areiagrossa + areiafina, areia),
-    areia_in = !is.na(areia),
-    areia = ifelse(dtp == 2 & !areia_in, 1000 - argila - silte, areia),
-    dtp = areia + argila + silte,
-    argila = round((argila / dtp) * 1000),
-    silte = round((silte / dtp) * 1000),
-    areia = round((areia / dtp) * 1000),
-    dtp = areia + argila + silte,
-    silte = ifelse(dtp != 1000, 1000 - areia - argila, silte),
-    terrafina_in = !is.na(terrafina),
-    cascalho_in = !is.na(cascalho),
-    calhau_in = !is.na(calhau),
-    terrafina = ifelse(!terrafina_in & cascalho_in & calhau_in, 1000 - cascalho - calhau, terrafina),
-    terrafina = ifelse(!terrafina_in & cascalho_in, 1000 - cascalho, terrafina),
-    terrafina = ifelse(!terrafina_in & calhau_in, 1000 - calhau, terrafina),
-    terrafina = ifelse(!terrafina_in & !cascalho_in & !calhau_in, 1000, terrafina) %>% round()
-  )
-```
-
-A última etapa de processamento lida com os dados da profundidade do solo, especificamente, com as camadas
-compostas por material orgânico. Em geral, o registro dessas camadas é realizado fixando o limite inferior como
-sendo igual a zero. Isso gera uma sequência invertida de valores de profundidade. Por exemplo, uma camada com 
-profundidade de 3--0 cm representa uma camada orgânica de três centímetros de espessura acima das camadas de
-material mineral do solo. Em alguns casos a profundidade superior pode ser negativa, por exemplo, -3--0 cm. O
-processamento desses dados consiste em ajustar a profundidade superior do solo a profundidade superior da 
-camada de material orgânico do solo, definida assim como sendo igual a zero centímetros de profundidade.
-
-```{r}
 correct_depth <-
   function (profund.sup, profund.inf) {
     res <- as.matrix(data.frame(profund.sup, profund.inf))
@@ -354,20 +238,53 @@ correct_depth <-
     }
     as.data.frame(res)
   }
-camada %<>% 
+camada %<>%
   dplyr::mutate(
+    argila_in = !is.na(argila),
+    silte_in = !is.na(silte),
+    areia_in = !is.na(areia),
+    dtp_in = argila_in + silte_in + areia_in,
+    argila = ifelse(dtp_in == 2 & !argila_in, 1000 - areia - silte, argila),
+    silte = ifelse(dtp_in == 2 & !silte_in, 1000 - argila - areia, silte),
+    areia = ifelse(!areia_in, areiagrossa + areiafina, areia),
+    areia_in = !is.na(areia),
+    areia = ifelse(dtp_in == 2 & !areia_in, 1000 - argila - silte, areia),
+    dtp = areia + argila + silte,
+    argila = round((argila / dtp) * 1000),
+    silte = round((silte / dtp) * 1000),
+    areia = round((areia / dtp) * 1000),
+    dtp = areia + argila + silte,
+    silte = ifelse(dtp != 1000, 1000 - areia - argila, silte),
+    terrafina_in = !is.na(terrafina),
+    cascalho_in = !is.na(cascalho),
+    calhau_in = !is.na(calhau),
+    terrafina = ifelse(!terrafina_in & cascalho_in & calhau_in, 1000 - cascalho - calhau, terrafina),
+    terrafina = ifelse(!terrafina_in & cascalho_in & !calhau_in, 1000 - cascalho, terrafina),
+    terrafina = ifelse(!terrafina_in & !cascalho_in & calhau_in, 1000 - calhau, terrafina),
+    terrafina = ifelse(!terrafina_in & !cascalho_in & !calhau_in, 1000, terrafina) %>% round(),
+    ph = ifelse(ph > 14, NA_real_, ph),
+    carbono = round(carbono, 2),
+    dsi = round(dsi, 2),
     profund_sup = ifelse(is.na(profund_inf), NA_real_, abs(profund_sup)),
     profund_inf = ifelse(is.na(profund_sup), NA_real_, abs(profund_inf))
   ) %>% 
   dplyr::group_by(dataset_id, observacao_id) %>%
   dplyr::mutate(
-    profund.sup = correct_depth(profund.sup = profund_sup, profund.inf = profund_inf)$profund.sup,
-    profund.inf = correct_depth(profund.sup = profund_sup, profund.inf = profund_inf)$profund.inf,
-    profund_sup = profund.sup,
-    profund_inf = profund.inf
+    sup = correct_depth(profund.sup = profund_sup, profund.inf = profund_inf)$profund.sup,
+    inf = correct_depth(profund.sup = profund_sup, profund.inf = profund_inf)$profund.inf,
+    profund_sup = sup,
+    profund_inf = inf
   ) %>% 
   dplyr::ungroup()
 ```
+
+A última etapa de processamento lida com os dados da profundidade do solo, especificamente, com as camadas
+compostas por material orgânico. Em geral, o registro dessas camadas é realizado fixando o limite inferior como
+sendo igual a zero. Isso gera uma sequência invertida de valores de profundidade. Por exemplo, uma camada com 
+profundidade de 3--0 cm representa uma camada orgânica de três centímetros de espessura acima das camadas de
+material mineral do solo. Em alguns casos a profundidade superior pode ser negativa, por exemplo, -3--0 cm. O
+processamento desses dados consiste em ajustar a profundidade superior do solo a profundidade superior da 
+camada de material orgânico do solo, definida assim como sendo igual a zero centímetros de profundidade.
 
 ```{r}
 camada %<>% 
@@ -382,7 +299,17 @@ Verificar a distribuição empírica dos dados, procurando por insconsistências
 png("../res/febr-camada.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 camada %>% 
   dplyr::rename(profund = profund_inf) %>%
-  dplyr::select(profund, carbono, argila, areia, silte, terrafina, dsi, ctc, ph, ce) %>% 
+  dplyr::select(
+    'profund\n(cm)' = profund, 
+    'carbono\n(g/kg)' = carbono,
+    'argila\n(g/kg)' = argila, 
+    'areia\n(g/kg)' = areia, 
+    'silte\n(g/kg)' = silte, 
+    'terrafina\n(g/kg)' = terrafina, 
+    'dsi\n(kg/dm³)' = dsi, 
+    'ctc\n(cmolc/kg)' = ctc,
+    'ph\n(-)' = ph,
+    'ce\n(mS/cm)' = ce) %>% 
   plot(cex = 0.5, col = "firebrick", main = glue::glue("{Sys.Date()}-febr-camada"))
 dev.off()
 ```
