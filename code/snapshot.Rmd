@@ -1,6 +1,43 @@
 ---
+title: "Superconjunto de dados abertos do solo"
+author: "Alessandro Samuel-Rosa"
+date: "`r Sys.Date()`"
 output: html_document
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.asp = 1)
+```
+
+## Apresentação
+
+Descarregamento e processamento (limpeza, padronização e harmonização) da versão corrente de um conjunto de 
+doze variáveis do solo disponíveis no ___febr___. São elas:
+
+* Tabela _observacao_:
+  - `taxon_sibcs`: classificação taxonômica pelo Sistema Brasileiro de Classificação do Solo;
+  - `taxon_st`: classificação taxonômica pelo Soil Taxonomy;
+  - `taxon_wrb`: classificação taxonômica pelo World Reference Base for Soil Resources;
+* Tabela _camada_:
+  - `terrafina`: conteúdo da fração terra fina (< 2 mm) no solo inteiro, em g/kg;
+  - `carbono`: conteúdo de carbono orgânico na fração terra fina, em g/kg;
+  - `argila`: conteúdo de argila total na fração terra fina, em g/kg;
+  - `silte`: conteúdo de silte total na fração terra fina, em g/kg;
+  - `areia`: conteúdo de areia total na fração terra fina, em g/kg;
+  - `ctc`: capacidade de troca de cátions da fração terra fina, em cmol~c~/kg;
+  - `ph`: pH em água da fração terra fina, se unidade de medida;
+  - `ce`: condutividade elétrica de fração terra fina, em mS/cm;
+  - `dsi`: densidade do solo inteiro, em kg/dm^3^.
+
+Acompanham também informações sobre a profundidade (`profund_sup` e `profund_inf`), em cm, data
+(`observacao_data`) e local (`coord_x` e `coord_y`) de amostragem/observação do solo. O sistema de referência
+de coordenadas espaciais utilizado é o SIRGAS 2000, com coordenadas espacials expressas em graus decimais.
+
+Os passos de limpeza dos dados descarregados são descritos abaixo, enquanto que os os passos de padronização e
+harmonização estão descritos na página do pacote `febr` para o R em https://febr-team.github.io/febr-package/.
+
+Depois de processados, os dados são disponibilizados ao público usando o formato universal CSV no repositório 
+do ___febr___ no GitHub em https://github.com/febr-team/febr-data/tree/master/data.
 
 ```{r}
 library(magrittr)
@@ -10,29 +47,12 @@ library(sf)
 library(febr)
 ```
 
-Descarregar e pós-processar (padronização e harmonização) versão corrente de um conjunto de doze variáveis
-disponíveis no ___febr___. São elas:
+## Tabelas _observacao_
 
-* Tabela `observacao`:
-  - Classificação taxonômica pelo Sistema Brasileiro de Classificação do Solo (`taxon_sibcs`)
-  - Classificação taxonômica pelo Soil Taxonomy (`taxon_st`)
-  - Classificação taxonômica pelo World Reference Base for Soil Resources (`taxon_wrb`)
-* Tabela `camada`:
-  - Conteúdo de fração terra fina (< 2 mm) no solo inteiro, em g/kg (`terrafina`)
-  - Conteúdo de carbono orgânico na fração terra fina, em g/kg (`carbono`)
-  - Conteúdo de argila total na fração terra fina, em g/kg (`argila`)
-  - Conteúdo de silte total na fração terra fina, em g/kg (`silte`)
-  - Conteúdo de areia total na fração terra fina, em g/kg (`areia`)
-  - Capacidade de troca de cátions da fração terra fina, em cmol~c~/kg (`ctc`)
-  - pH em água da fração terra fina (`ph`)
-  - Condutividade elétrica de fração terra fina, em mS/cm (`ce`)
-  - Densidade do solo inteiro, em kg/dm^3^ (`dsi`)
+### Descarregamento
 
-A maioria dos passos de padronização e harmonização dos dados estão descritos na página do pacote `febr` para
-o R em https://febr-team.github.io/febr-package/. Os dados são disponibilizados ao público usando o formato 
-universal CSV no repositório do ___febr___ no GitHub em https://github.com/febr-team/febr-data/tree/master/data.
-
-## Tabelas `observacao`
+Os dados das tabelas _observacao_ de cada conjunto de dados são descarregados utilizando o nível 3 de
+harmonização.
 
 ```{r}
 vars <- "taxon_"
@@ -47,48 +67,23 @@ observacao <- observation(
   harmonization = list(harmonize = TRUE, level = 3))
 ```
 
-### Classificação taxonômica
+### Processamento
 
-O processamento dos dados de classificação taxonômica segue os seguintes passos:
+Para os três sistemas de classificação taxonômica do solo, o processamento dos dados segue os seguintes passos:
 
-1. Fusão das colunas `taxon_sibcs_<...>` em uma única coluna `taxon_sibcs` usando `dplyr::coalesce()`, dando
-   prioridade à classificação mais recente. Por enquanto, a classificação antiga (antes de 1999) é ignorada, 
-   pois a nomenclatura utilizada é muito diferente da nomenclatura atual. Nesse caso, observações apenas com a
-   classificação taxonômica antiga do SiBCS ficam sem dados (`NA_character`) na nova coluna `taxon_sibcs`.
-2. Substituição da classificação taxonômica no SiBCS registrada na forma de sigla pelo nome correspondente por
-   extenso usando `dplyr::recode()`.
-3. Eliminação do terceiro e quarto níveis categóricos da classificação taxonômica do SiBCS usando
-   `base::strsplit()`.
-4. Formatação da classificação taxonômica no SiBCS em caixa alta.
-5. Fusão das colunas `taxon_st_<...>` e `taxon_wrb_<...>` em uma única coluna `taxon_st` e `taxon_wrb`, 
-   respectivamente, dando prioridade à classificação mais recente. Diferente da classificação taxonômica no
-   SiBCS, aqui as classificações antigas não são ignoradas.
-
-```{r}
-sibcs_tabela <- 
-  "1yJ_XnsJhnhJSfC3WRimfu_3_owXxpfSKaoxCiMD2_Z0" %>% 
-  gs_key %>% 
-  gs_read_csv()
-sibcs_siglas <- sibcs_tabela$campo_codigo
-sibcs_tabela <- as.list(sibcs_tabela$campo_nome)
-names(sibcs_tabela) <- sibcs_siglas
-observacao <- 
-  observacao %>% 
-  mutate(
-    taxon_sibcs = dplyr::coalesce(
-      taxon_sibcs_2013, taxon_sibcs_2009, taxon_sibcs_2006, taxon_sibcs_2003, taxon_sibcs_1999),
-      # taxon_sibcs_19xx, taxon_sibcs_xxx, taxon_sibcs_xxx_1, taxon_sibcs_xxx_2, taxon_sibcs_xxxx),
-    taxon_sibcs = dplyr::recode(.data$taxon_sibcs, !!!sibcs_tabela),
-    taxon_sibcs = sapply(
-      .data$taxon_sibcs, function (x) strsplit(x, " ")[[1]][1:2] %>% paste(collapse = " ")) %>% as.character,
-    taxon_sibcs = gsub(pattern = "NA NA", NA_character_, .data$taxon_sibcs),
-    taxon_sibcs = toupper(taxon_sibcs)) %>% 
-  mutate(
-    taxon_st = coalesce(taxon_st_2010, taxon_st_1999, taxon_st_xxx),
-    taxon_wrb = coalesce(taxon_wrb_2006, taxon_wrb_1998, taxon_wrb_xxx))
-```
-
-### Organização das colunas
+1. Fusão das colunas com a classificação taxonômica do solo nas diferentes versões de um mesmo sistema de 
+   classificação taxonômica. Prioridade é dada à classificação mais recente. No caso do Sistema Brasileiro de
+   Classificação do Solo, `sibcs`, classificações anteriores a 1999 são ignoradas, pois a nomenclatura 
+   utilizada é muito diferente da nomenclatura atual. Nesse caso, observações apenas com a classificação
+   taxonômica antiga do `sibcs` ficam sem dados (`NA_character`). Os códigos de identificação das colunas
+   resultantes da fusão das colunas de cada um dos três sistema de classificação taxonômica são `taxon_sibcs`,
+   `taxon_st` e `taxon_wrb`.
+2. Para `taxon_sibcs`, substituição da classificação taxonômica registrada na forma de sigla pelo nome
+   correspondente por extenso, seguida da eliminação de níveis categóricos inferiores, mantendo-se apenas o
+   primeiro (ordem) e o segundo (subordem).
+3. Para `taxon_sibcs`, `taxon_st` e `taxon_wrb`, limpeza e padronização da formatação das correntes de
+   caracteres que representam cada classificação taxonômica do solo (caixa alta, sem acentuação, sem ponto 
+   final).
 
 As colunas são organizadas usando `dplyr::select()` de maneira a:
 
@@ -103,51 +98,270 @@ O tipo de dados das colunas também é definido aqui:
 1. Os dados da coluna `coord_precisao` são definidos como do tipo real usando `as.numeric()`.
 
 ```{r}
-observacao %<>%
+sibcs_tabela <- 
+  "1yJ_XnsJhnhJSfC3WRimfu_3_owXxpfSKaoxCiMD2_Z0" %>% 
+  gs_key %>% 
+  gs_read_csv()
+sibcs_siglas <- sibcs_tabela$campo_codigo
+sibcs_tabela <- as.list(sibcs_tabela$campo_nome)
+names(sibcs_tabela) <- sibcs_siglas
+pruneStrings <- 
+  function (x, n, split = " ", collapse = " ") {
+    res <- 
+      sapply(x, function (x) {
+        res <- strsplit(x = x, split = split)[[1]][1:n]
+        res <- paste(res, collapse = collapse)
+        res <- as.character(res)
+        res <- gsub(pattern = "NA NA", replacement = NA_character_, x = res)
+        res <- gsub(pattern = " NA$", "", res)
+        return (res)
+      })
+    return (res)
+  }
+observacao <- 
+  observacao %>% 
+  mutate(
+    taxon_sibcs = dplyr::coalesce(
+      taxon_sibcs_2013, taxon_sibcs_2009, taxon_sibcs_2006, taxon_sibcs_2003, taxon_sibcs_1999),
+      # taxon_sibcs_19xx, taxon_sibcs_xxx, taxon_sibcs_xxx_1, taxon_sibcs_xxx_2, taxon_sibcs_xxxx),
+    taxon_sibcs = dplyr::recode(.data$taxon_sibcs, !!!sibcs_tabela),
+    taxon_sibcs = pruneStrings(taxon_sibcs, n = 2),
+    taxon_sibcs = toupper(taxon_sibcs),
+    taxon_sibcs = gsub(pattern = ".", "", .data$taxon_sibcs, fixed = TRUE),
+    taxon_sibcs = chartr("áéíóúÁÉÍÓÚ", "aeiouAEIOU", .data$taxon_sibcs),
+    taxon_st = coalesce(taxon_st_2010, taxon_st_1999, taxon_st_xxx),
+    taxon_st = toupper(taxon_st),
+    taxon_st = gsub(pattern = ".", "", .data$taxon_st, fixed = TRUE),
+    taxon_wrb = coalesce(taxon_wrb_2006, taxon_wrb_1998, taxon_wrb_xxx),
+    taxon_wrb = toupper(taxon_wrb),
+    taxon_wrb = gsub(pattern = ".", "", .data$taxon_wrb, fixed = TRUE),
+    coord_precisao = as.numeric(coord_precisao),
+    coord_x = round(coord_x, 8),
+    coord_y = round(coord_y, 8),
+    amostra_tipo = toupper(amostra_tipo),
+    amostra_quanti = as.integer(amostra_quanti),
+    municipio_id = gsub(pattern = ".", "", .data$municipio_id, fixed = TRUE)
+  ) %>% 
   dplyr::select(
     dataset_id, observacao_id, sisb_id, ibge_id, observacao_data, coord_x, coord_y, coord_precisao, 
     coord_fonte, pais_id, estado_id, municipio_id, amostra_tipo, amostra_quanti, amostra_area, taxon_sibcs, 
-    taxon_st, taxon_wrb) %>% 
-  dplyr::mutate(
-    coord_precisao = as.numeric(coord_precisao))
+    taxon_st, taxon_wrb)
 ```
 
 ```{r}
-head(observacao)
+mess <- 
+  function (x) {
+    n <- nrow(x)
+    x[sample(x = seq(n), size = n), ]
+  }
+mess(observacao)
 ```
 
-### Figuras
-
-Verificar distribuição espacial das observações.
+### Análise exploratória
 
 ```{r}
-png("../res/febr-observacao-espaco.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+tmp <-
+  observacao %>% 
+  summarise(
+    Total = n(),
+    `Lat/Long` = sum(!is.na(coord_x)),
+    Precisão = median(coord_precisao, na.rm = TRUE),
+    GPS = sum(coord_fonte == "GPS", na.rm = TRUE),
+    MAPA = sum(coord_fonte == "MAPA", na.rm = TRUE),
+    WEB = sum(coord_fonte == "WEB", na.rm = TRUE)
+  ) %T>% 
+  print()
+```
+
+O ___febr___ dispõe de um total de 14664 observações do solo. Destas, 11580 possuem coordenadas espaciais, ou
+seja, 11580 / 14664 * 100 = 79%. A precisão mediana das coordenadas espaciais é de 100 m. A fonte de boa parte
+das coordenadas é desconhecida, sendo o GPS a fonte mais comum. Boa parte das coordenadas foi estimada usando
+serviços de mapas online (WEB), ou então foram estimadas usando, por exemplo, mapas base (MAPA), sendo 
+posteriormente ajustadas ou corrigidas usando serviços online como o Google Maps.
+
+```{r}
+br <- sf::read_sf("../data/br.shp")
+tmp <- 
+  observacao$estado_id %>% 
+  table()
+idx <- match(br$SigUF, names(tmp))
+dens <- tmp[idx] / br$area
+dens <- dens[order(dens)]
+# png("../res/febr-observacao-espaco.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+plot(
+  br[1], graticule = TRUE, axes = TRUE, 
+  sub = Sys.Date(), main = "Distribuição espacial das observações", 
+  col = 0, xlab = "Longitude", ylab = "Longitude", reset = FALSE)
 observacao %>% 
   filter(!is.na(coord_x) | !is.na(coord_y)) %>% 
-  st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4674) %>%
+  st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4326) %>%
   dplyr::select(pais_id) %>% 
-  plot(
-    cex = 0.5, col = "firebrick", axes = TRUE, 
-    graticule = TRUE, main = glue::glue("{Sys.Date()}-febr-observacao"))
-dev.off()
+  plot(cex = 0.5, col = "firebrick1", add = TRUE)
+# dev.off()
 ```
 
-Verificar temporal espacial das observações.
+```{r}
+tmp2 <- 
+  data.frame(
+    n_max = max(tmp),
+    n_min = min(tmp),
+    d_max = max(dens),
+    d_min = min(dens)
+  ) %T>% 
+  print()
+```
+
+A distribuição espacial das observações do solo é bastante heterogênea, com inúmeros agrupamentos de 
+observações aparecendo em várias partes do território nacional. Consequentemente, amplos vazios de observações
+aparecem. O estado de Rondônia concentra o maior número de observações, especificamente, 3031 observações. 
+Enquanto isso, o menos número de observações parece no estado do Tocantis -- apenas 71 observações. Devido ao 
+seu relativamente grande território, o estado do Tocantis também possui a menor densidade de observação: 0,26 
+observações a cada 1000 km². A maior densidade de observação é no Distrito Federal, com 27 observações a cada
+1000 km². Em geral, os estados das regiões Centro-Oeste, Norte e Nordeste são aqueles com as menores densidades
+de observação, refletindo o histórico de ocupação do território brasileiro e os investimentos feitos no ensino
+e pesquisa via universidades e centros de pesquisa agronômica.
 
 ```{r}
-png("../res/febr-observacao-tempo.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+layout(matrix(1:2, nrow = 1), widths = c(2, 2), heights = 1, respect = FALSE)
+par(oma = c(0, 0, 1, 0), las = 1)
+tmp %>% 
+  sort() %>% 
+  barplot(
+    col = "firebrick1", border = "firebrick1", horiz = TRUE, ann = FALSE,
+    ylab = "Unidade da federação", xlab = "Número de observações")
+grid()
+dens %>% 
+  barplot(
+    col = "firebrick1", border = "firebrick1", horiz = TRUE, ann = FALSE,
+    ylab = "Unidade da federação", xlab = "Densidade de observações (por 1000 km²)")
+title(main = "Distribuição das observações pelas unidades da federação", sub = Sys.Date(), outer = TRUE)
+grid()
+```
+
+Das observações sem coordenadas espaciais (14664 - 11580 = 3084), a maioria se encontra nos estados da Bahia
+(434), Minas Gerais (383), Paraná (348) e Pará (289). Três conjuntos de dados concentram parte considerável
+dessas observações -- ctb0657, ctb0831 e ctb0775 --, cada um com mais de 100 observações sem coordenadas
+espaciais. Outros 14 conjuntos de dados possuem entre 50 e 100 observações sem coordenadas espaciais.
+
+```{r}
+layout(matrix(1:2, nrow = 1), widths = c(2, 2), heights = 1, respect = FALSE)
+par(oma = c(0, 0, 1, 0), las = 1)
+observacao %>% 
+  dplyr::filter(is.na(coord_x)) %>% 
+  dplyr::select(estado_id) %>% 
+  dplyr::mutate(estado_id = as.factor(estado_id)) %>% 
+  table() %>% 
+  sort() %>% 
+  barplot(
+    col = "firebrick1", border = "firebrick1", horiz = TRUE,
+    ylab = "Unidade da federação", xlab = "Número de observações")
+grid()
+observacao %>% 
+  dplyr::filter(is.na(coord_x)) %>% 
+  dplyr::select(dataset_id) %>% 
+  dplyr::mutate(dataset_id = as.factor(dataset_id)) %>% 
+  table() %>% 
+  sort(decreasing = TRUE) %>% 
+  head(27L) %>% 
+  sort() %>% 
+  barplot(
+    col = "firebrick1", border = "firebrick1", horiz = TRUE,
+    names.arg = gsub("ctb0", "", names(.)),
+    ylab = "Conjunto de dados", xlab = "Número de observações")
+grid()
+title(main = "Distribuição das observações sem coordenadas espaciais", sub = Sys.Date(), outer = TRUE)
+```
+
+```{r}
+observacao %>% 
+  mutate(observacao_data = as.Date(observacao_data) %>% format("%Y")) %>% 
+  summarise(
+    Total = n(),
+    Data = sum(!is.na(observacao_data)),
+    `<1960` = sum(observacao_data < 1960, na.rm = TRUE),
+    `1960-1990` = (sum(observacao_data < 1990, na.rm = TRUE) - `<1960`),
+    `1990-2010` = (sum(observacao_data < 2010, na.rm = TRUE) - `<1960` - `1960-1990`),
+    `2010-2019` = (sum(observacao_data < 2019, na.rm = TRUE) - `<1960` - `1960-1990` - `1990-2010`)
+    ) %>% 
+  dplyr::mutate(
+    `<1960` = round(`<1960` / Data * 100, 2),
+    `1960-1990` = round(`1960-1990` / Data * 100, 2),
+    `1990-2010` = round(`1990-2010` / Data * 100, 2),
+    `2010-2019` = round(`2010-2019` / Data * 100, 2)
+  )
+```
+
+Apenas cerca de 9693 / 14664 * 100 = 66% das observações do solo possuem registro da data de observação. 
+Destas, metadade -- 51% -- foram obtidas entre 1990 e 2010. Isso se deve a um pico no ano de 1997, ano em que
+foram obtidas as observações do solo do maior conjunto de dados disponível no ___febr___. Trata-se do conjunto
+de dados do Zoneamento Agroecológico do Estado de Rondônia, que possui mais de 2000 observações do solo. Das
+observações sem data de observação, acredita-se que 
+
+Acredita-se que esse número seja bastante
+maior, pois se sabe que a maioria dos conjuntos de dados hoje disponíveis no ___febr___ foram produzidos nesse
+período, principalmente na década de 1970.
+
+A distribuição das observações do solo no tempo mostra que há um vazio entre as décadas de 1980 e 1990. Esse
+período foi marcado pelo término dos principas projetos/programas de mapeamento do solo em larga escala no 
+Brasil. Contudo, como parte considerável das observações do solo não possui informação sobre a data de 
+observação, não é possível identificar a razão do vazio com precisão.
+
+```{r}
+tmp <- observacao[!is.na(tmp$coord_x), c("coord_x", "coord_y", "observacao_data")]
+idx <- duplicated(tmp)
+sum(idx)
+```
+
+
+```{r}
+# png("../res/febr-observacao-tempo.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 tmp <- 
   observacao$observacao_data %>%
   as.Date() %>% 
   format("%Y") %>% 
   table()
-barplot(tmp, col = "firebrick", border = "firebrick")
+barplot(tmp, col = "firebrick1", border = "firebrick1")
 grid()
 barplot(
-  tmp, col = "firebrick", border = "firebrick", add = TRUE, xlab = "Ano", ylab = "Número de observações",
-  main = glue::glue("{Sys.Date()}-febr-observacao"))
-dev.off()
+  tmp, col = "firebrick1", border = "firebrick1", add = TRUE, xlab = "Ano", ylab = "Número de observações",
+  main = "Distribuição temporal das observações", sub = glue::glue("Versão {Sys.Date()}"))
+# dev.off()
 ```
+
+A maioria das observações sem data de observação pertencem a conjuntos de dados que abrangem os estados do 
+Amazonas, Rio Grande do Sul, Bahia, Pará, Minas Gerais e Paraná. Dentre estes, três conjuntos de dados se 
+destacam pelo grande número de observações sem coordenadas. São eles: ctb0770, no Rio Grande do Sul, ctb0657, 
+na Bahia, e ctb831, no Paraná.
+
+```{r}
+layout(matrix(1:2, nrow = 1), widths = c(2, 2), heights = 1, respect = FALSE)
+par(oma = c(0, 0, 1, 0), las = 1)
+observacao %>% 
+  dplyr::filter(is.na(observacao_data)) %>% 
+  dplyr::select(estado_id) %>% 
+  dplyr::mutate(estado_id = as.factor(estado_id)) %>% 
+  table() %>% 
+  sort() %>% 
+  barplot(
+    col = "firebrick1", border = "firebrick1", horiz = TRUE,
+    ylab = "Unidade da federação", xlab = "Número de observações")
+grid()
+observacao %>% 
+  dplyr::filter(is.na(observacao_data)) %>% 
+  dplyr::select(dataset_id) %>% 
+  dplyr::mutate(dataset_id = as.factor(dataset_id)) %>% 
+  table() %>% 
+  sort(decreasing = TRUE) %>% 
+  head(27L) %>% 
+  sort() %>% 
+  barplot(
+    col = "firebrick1", border = "firebrick1", horiz = TRUE,
+    names.arg = gsub("ctb0", "", names(.)),
+    ylab = "Conjunto de dados", xlab = "Número de observações")
+grid()
+title(main = "Distribuição das observações sem data", sub = Sys.Date(), outer = TRUE)
+```
+
 
 ### Salvar dados
 
@@ -158,7 +372,7 @@ write.table(
   observacao, file = glue::glue("../data/febr-observacao.csv"), sep = ";", dec = ",", row.names = FALSE)
 ```
 
-## Tabelas `camada`
+## Tabelas _camada_
 
 ```{r}
 vars <- c(
