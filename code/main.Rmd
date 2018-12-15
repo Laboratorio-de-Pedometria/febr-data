@@ -68,7 +68,15 @@ Instituto Nacional de Geografia e Estatística.
 if (!file.exists("../data/br.shp")) {
   # http://www.geoservicos.ibge.gov.br/geoserver/wfs?service=wfs&version=1.1.0&request=GetCapabilities
   dsn <- "WFS:http://www.geoservicos.ibge.gov.br:80/geoserver/wfs"
-  br <- readOGR(dsn = dsn, layer = "CGEO:C02_limite_estadual_2010")
+  br <- rgdal::readOGR(dsn = dsn, layer = "CGEO:C02_limite_estadual_2010")
+  crs <- sp::CRS("+proj=utm +zone=22 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
+  br <- sp::spTransform(br, crs)
+  br$area <- rgeos::gArea(br, byid = TRUE) / (1000 * 1000 * 1000)
+  br$SigUF <- br$NomUF
+  SigUF <- uf$estado_id %>% as.list()
+  names(SigUF) <- uf$estado_nome
+  br$SigUF <- recode(br$SigUF, !!!SigUF)
+  br <- sp::spTransform(br, "+proj=longlat +ellps=WGS84")
   raster::shapefile(br, filename = "../data/br.shp")
 }
 ```
