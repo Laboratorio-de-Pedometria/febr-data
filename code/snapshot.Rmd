@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, fig.asp = 1)
 ## Apresentação
 
 Descarregamento e processamento (limpeza, padronização e harmonização) da versão corrente de um conjunto de 
-doze variáveis do solo disponíveis no ___febr___. São elas:
+12 variáveis do solo disponíveis no ___febr___. São elas:
 
 * Tabela _observacao_:
   - `taxon_sibcs`: classificação taxonômica pelo Sistema Brasileiro de Classificação do Solo;
@@ -25,15 +25,16 @@ doze variáveis do solo disponíveis no ___febr___. São elas:
   - `silte`: conteúdo de silte total na fração terra fina, em g/kg;
   - `areia`: conteúdo de areia total na fração terra fina, em g/kg;
   - `ctc`: capacidade de troca de cátions da fração terra fina, em cmol~c~/kg;
-  - `ph`: pH em água da fração terra fina, se unidade de medida;
+  - `ph`: pH em água da fração terra fina, sem unidade de medida;
   - `ce`: condutividade elétrica de fração terra fina, em mS/cm;
   - `dsi`: densidade do solo inteiro, em kg/dm^3^.
 
 Acompanham também informações sobre a profundidade (`profund_sup` e `profund_inf`), em cm, data
 (`observacao_data`) e local (`coord_x` e `coord_y`) de amostragem/observação do solo. O sistema de referência
-de coordenadas espaciais utilizado é o SIRGAS 2000, com coordenadas espacials expressas em graus decimais.
+de coordenadas espaciais utilizado é o SIRGAS 2000 (EPSG:4674), com coordenadas espacials expressas em graus
+decimais.
 
-Os passos de limpeza dos dados descarregados são descritos abaixo, enquanto que os os passos de padronização e
+Os passos de limpeza dos dados descarregados são descritos abaixo, enquanto que os passos de padronização e
 harmonização estão descritos na página do pacote `febr` para o R em https://febr-team.github.io/febr-package/.
 
 Depois de processados, os dados são disponibilizados ao público usando o formato universal CSV no repositório 
@@ -51,7 +52,7 @@ library(febr)
 
 ### Descarregamento
 
-Os dados das tabelas _observacao_ de cada conjunto de dados são descarregados utilizando o nível 3 de
+Os dados das tabelas _observacao_ de cada conjunto de dados são descarregados utilizando o nível `3` de
 harmonização.
 
 ```{r}
@@ -85,7 +86,7 @@ Para os três sistemas de classificação taxonômica do solo, o processamento d
    caracteres que representam cada classificação taxonômica do solo (caixa alta, sem acentuação, sem ponto 
    final).
 
-As colunas são organizadas usando `dplyr::select()` de maneira a:
+As colunas são organizadas de maneira a:
 
 1. Descartar as colunas `taxon_sibcs_<...>`, `taxon_st_<...>` e `taxon_wrb_<...>`, processadas acima e 
    substituidas pelas colunas `taxon_sibcs`, `taxon_st` e `taxon_wrb`, respectivamente.
@@ -180,7 +181,7 @@ serviços de mapas online (WEB), ou então foram estimadas usando, por exemplo, 
 posteriormente ajustadas ou corrigidas usando serviços online como o Google Maps.
 
 ```{r}
-br <- sf::read_sf("../data/br.shp")
+br <- sf::read_sf("../data/vector/br.shp")
 tmp <- 
   observacao$estado_id %>% 
   table()
@@ -214,7 +215,7 @@ tmp2 <-
 A distribuição espacial das observações do solo é bastante heterogênea, com inúmeros agrupamentos de 
 observações aparecendo em várias partes do território nacional. Consequentemente, amplos vazios de observações
 aparecem. O estado de Rondônia concentra o maior número de observações, especificamente, 3031 observações. 
-Enquanto isso, o menos número de observações parece no estado do Tocantis -- apenas 71 observações. Devido ao 
+Enquanto isso, o menor número de observações parece no estado do Tocantis -- apenas 71 observações. Devido ao 
 seu relativamente grande território, o estado do Tocantis também possui a menor densidade de observação: 0,26 
 observações a cada 1000 km². A maior densidade de observação é no Distrito Federal, com 27 observações a cada
 1000 km². Em geral, os estados das regiões Centro-Oeste, Norte e Nordeste são aqueles com as menores densidades
@@ -295,11 +296,8 @@ Apenas cerca de 9693 / 14664 * 100 = 66% das observações do solo possuem regis
 Destas, metadade -- 51% -- foram obtidas entre 1990 e 2010. Isso se deve a um pico no ano de 1997, ano em que
 foram obtidas as observações do solo do maior conjunto de dados disponível no ___febr___. Trata-se do conjunto
 de dados do Zoneamento Agroecológico do Estado de Rondônia, que possui mais de 2000 observações do solo. Das
-observações sem data de observação, acredita-se que 
-
-Acredita-se que esse número seja bastante
-maior, pois se sabe que a maioria dos conjuntos de dados hoje disponíveis no ___febr___ foram produzidos nesse
-período, principalmente na década de 1970.
+observações sem data de observação, acredita-se que a maioria foi produzida na década de 1970, período de maior
+realização de levantamentos de solo no Brasil.
 
 A distribuição das observações do solo no tempo mostra que há um vazio entre as décadas de 1980 e 1990. Esse
 período foi marcado pelo término dos principas projetos/programas de mapeamento do solo em larga escala no 
@@ -307,11 +305,10 @@ Brasil. Contudo, como parte considerável das observações do solo não possui 
 observação, não é possível identificar a razão do vazio com precisão.
 
 ```{r}
-tmp <- observacao[!is.na(tmp$coord_x), c("coord_x", "coord_y", "observacao_data")]
-idx <- duplicated(tmp)
-sum(idx)
+observacao[!is.na(observacao$coord_x), c("coord_x", "coord_y", "observacao_data")] %>% 
+  duplicated() %>% 
+  sum()
 ```
-
 
 ```{r}
 # png("../res/febr-observacao-tempo.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
@@ -328,10 +325,10 @@ barplot(
 # dev.off()
 ```
 
-A maioria das observações sem data de observação pertencem a conjuntos de dados que abrangem os estados do 
-Amazonas, Rio Grande do Sul, Bahia, Pará, Minas Gerais e Paraná. Dentre estes, três conjuntos de dados se 
-destacam pelo grande número de observações sem coordenadas. São eles: ctb0770, no Rio Grande do Sul, ctb0657, 
-na Bahia, e ctb831, no Paraná.
+A maioria das observações com data de observação desconhecida pertencem a conjuntos de dados que abrangem os
+estados do Amazonas, Rio Grande do Sul, Bahia, Pará, Minas Gerais e Paraná. Dentre estes, três conjuntos de
+dados se destacam pelo grande número de observações sem coordenadas. São eles: ctb0770, no Rio Grande do Sul,
+ctb0657, na Bahia, e ctb831, no Paraná.
 
 ```{r}
 layout(matrix(1:2, nrow = 1), widths = c(2, 2), heights = 1, respect = FALSE)
@@ -359,7 +356,7 @@ observacao %>%
     names.arg = gsub("ctb0", "", names(.)),
     ylab = "Conjunto de dados", xlab = "Número de observações")
 grid()
-title(main = "Distribuição das observações sem data", sub = Sys.Date(), outer = TRUE)
+title(main = "Distribuição das observações com data desconhecida", sub = Sys.Date(), outer = TRUE)
 ```
 
 
@@ -510,7 +507,7 @@ camada %<>%
 Verificar a distribuição empírica dos dados, procurando por insconsistências nos dados.
 
 ```{r}
-png("../res/febr-camada.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+png("../res/fig/febr-camada.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 camada %>% 
   dplyr::rename(profund = profund_inf) %>%
   dplyr::select(
