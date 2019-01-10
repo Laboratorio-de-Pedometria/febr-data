@@ -22,14 +22,14 @@ if (class(sheets_keys)[1] == "try-error") {
   download.file(url, destfile = tempfile)
   sheets_keys <- readr::read_csv(tempfile)
 }
-save(sheets_keys, file = "../data/febr-chaves.rda")
+save(sheets_keys, file = "../data/r/febr-chaves.rda")
 ```
 
 ## Tabelas `dataset`
 
 ```{r}
 dts <- febr::dataset(dataset = 'all')
-save(dts, file = "../data/dts.rda")
+save(dts, file = "../data/r/dts.rda")
 ```
 
 ## Tabelas `observacao`
@@ -38,7 +38,7 @@ save(dts, file = "../data/dts.rda")
 obs <- febr::observation(
   dataset = 'all', variable = "coord_descricao", 
   standardization = list(crs = "EPSG:4674", time.format = "%d-%m-%Y"))
-save(obs, file = "../data/obs.rda")
+save(obs, file = "../data/r/obs.rda")
 ```
 
 ## Tabelas `camada`
@@ -47,7 +47,7 @@ save(obs, file = "../data/obs.rda")
 lyr <- febr::layer(
   dataset = "all", 
   standardization = list(plus.sign = "remove", transition = "smooth"))
-save(lyr, file = "../data/lyr.rda")
+save(lyr, file = "../data/r/lyr.rda")
 ```
 
 ## Estados brasileiros
@@ -58,14 +58,14 @@ Descarregar a planilha `febr-estados` contendo as siglas e nomes dos estados bra
 uf <-
   gs_key('1bTIcFLpnOefYs_BaegPC59kbF3gEugOXpYpnfyrDsDQ') %>% 
   gs_read_csv(verbose = FALSE)
-save(uf, file = '../data/uf.rda')
+save(uf, file = '../data/r/uf.rda')
 ```
 
 Descarregar arquivo vetorial contendo os limites das unidades federativas brasileiras. A fonte dos dados é o
 Instituto Nacional de Geografia e Estatística.
 
 ```{r}
-if (!file.exists("../data/br.shp")) {
+if (!file.exists("../data/vector/br.shp")) {
   # http://www.geoservicos.ibge.gov.br/geoserver/wfs?service=wfs&version=1.1.0&request=GetCapabilities
   dsn <- "WFS:http://www.geoservicos.ibge.gov.br:80/geoserver/wfs"
   br <- rgdal::readOGR(dsn = dsn, layer = "CGEO:C02_limite_estadual_2010")
@@ -75,9 +75,8 @@ if (!file.exists("../data/br.shp")) {
   br$SigUF <- br$NomUF
   SigUF <- uf$estado_id %>% as.list()
   names(SigUF) <- uf$estado_nome
-  br$SigUF <- recode(br$SigUF, !!!SigUF)
+  br$SigUF <- dplyr::recode(br$SigUF, !!!SigUF)
   br <- sp::spTransform(br, "+proj=longlat +ellps=WGS84")
-  raster::shapefile(br, filename = "../data/br.shp")
+  raster::shapefile(br, filename = "../data/vector/br.shp")
 }
 ```
-
