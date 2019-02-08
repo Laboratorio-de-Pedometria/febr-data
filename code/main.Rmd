@@ -22,7 +22,9 @@ if (class(sheets_keys)[1] == "try-error") {
   download.file(url, destfile = tempfile)
   sheets_keys <- readr::read_csv(tempfile)
 }
-save(sheets_keys, file = "../data/r/febr-chaves.rda")
+sheets_keys %>% 
+  dplyr::arrange(ctb) %>% 
+  save(file = "../data/r/febr-chaves.rda")
 ```
 
 ## Tabelas _dataset_
