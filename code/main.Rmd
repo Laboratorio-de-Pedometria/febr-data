@@ -25,14 +25,20 @@ if (class(sheets_keys)[1] == "try-error") {
 save(sheets_keys, file = "../data/r/febr-chaves.rda")
 ```
 
-## Tabelas `dataset`
+## Tabelas _dataset_
+
+Descarrega a tabela _dataset_ de cada um dos conjuntos de dados publicados no ___febr___ e as escreve em disco
+no formato RDA. Esses dados são usados para a construção do cátalogo do ___febr___.
 
 ```{r}
 dts <- febr::dataset(dataset = 'all')
 save(dts, file = "../data/r/dts.rda")
 ```
 
-## Tabelas `observacao`
+## Tabelas _observacao_
+
+Descarrega a tabela _observacao_ de cada um dos conjuntos de dados publicados no ___febr___ e as escreve em
+disco no formato RDA. Esses dados são usados para a construção do cátalogo do ___febr___.
 
 ```{r}
 obs <- febr::observation(
@@ -66,8 +72,8 @@ Instituto Nacional de Geografia e Estatística.
 
 ```{r}
 if (!file.exists("../data/vector/br.shp")) {
-  # http://www.geoservicos.ibge.gov.br/geoserver/wfs?service=wfs&version=1.1.0&request=GetCapabilities
-  dsn <- "WFS:http://www.geoservicos.ibge.gov.br:80/geoserver/wfs"
+  # https://geoservicos.ibge.gov.br/geoserver/ows?service=wfs&version=1.1.0&request=GetCapabilities
+  dsn <- "WFS:https://geoservicos.ibge.gov.br/geoserver/wfs"
   br <- rgdal::readOGR(dsn = dsn, layer = "CGEO:C02_limite_estadual_2010")
   crs <- sp::CRS("+proj=utm +zone=22 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
   br <- sp::spTransform(br, crs)
