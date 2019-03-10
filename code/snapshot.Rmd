@@ -393,11 +393,11 @@ dev.off()
 
 ### Salvar dados
 
-Salvar os dados no formato CSV.
+Salvar os dados no formato TXT.
 
 ```{r}
 write.table(
-  observacao, file = glue::glue("../data/febr-observacao.csv"), sep = ",", dec = ",", row.names = FALSE)
+  observacao, file = glue::glue("../data/febr-observacao.txt"), sep = ";", dec = ",", row.names = FALSE)
 ```
 
 ## Tabelas _camada_
@@ -624,15 +624,22 @@ dev.off()
 
 ### Salvar dados
 
-Salvar os dados no formato CSV.
+Salvar os dados no formato TXT.
 
 ```{r}
-write.table(camada, file = glue::glue("../data/febr-camada.csv"), sep = ",", dec = ",", row.names = FALSE)
+write.table(camada, file = glue::glue("../data/febr-camada.txt"), sep = ";", dec = ",", row.names = FALSE)
 ```
 
 ## Tabelas `observacao` + `camada`
 
 ```{r}
 febr <- merge(observacao, camada, by = c("dataset_id", "observacao_id"))
-write.table(febr, file = "../data/febr-superconjunto.csv", sep = ",", dec = ",", row.names = FALSE)
+```
+
+### Salvar dados
+
+Salvar os dados no formato TXT.
+
+```{r}
+write.table(febr, file = "../data/febr-superconjunto.txt", sep = ";", dec = ",", row.names = FALSE)
 ```
