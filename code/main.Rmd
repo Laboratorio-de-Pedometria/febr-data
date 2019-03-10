@@ -4,10 +4,6 @@ output: html_document
 
 ```{r}
 library(magrittr)
-library(glue)
-library(googlesheets)
-library(rgdal)
-library(gdalUtils)
 ```
 
 Descarregar a planilha `febr-chaves` contendo as chaves de identificação das tabelas dos conjuntos de dados
@@ -15,16 +11,15 @@ publicados no ___febr___.
 
 ```{r}
 key <- "18yP9Hpp8oMdbGsf6cVu4vkDv-Dj-j5gjEFgEXN-5H-Q"
-sheets_keys <- try(gs_key(key) %>% gs_read_csv(), TRUE)
+sheets_keys <- try(googlesheets::gs_key(key) %>% googlesheets::gs_read_csv(), TRUE)
 if (class(sheets_keys)[1] == "try-error") {
   url <- glue::glue("https://docs.google.com/spreadsheets/d/{key}/export?format=csv")
   tempfile <- tempfile(fileext = "cvs")
   download.file(url, destfile = tempfile)
   sheets_keys <- readr::read_csv(tempfile)
 }
-sheets_keys %>% 
-  dplyr::arrange(ctb) %>% 
-  save(file = "../data/r/febr-chaves.rda")
+sheets_keys %<>% dplyr::arrange(ctb)
+save(sheets_keys, file = "../data/r/febr-chaves.rda")
 ```
 
 ## Tabelas _dataset_
@@ -64,8 +59,8 @@ Descarregar a planilha `febr-estados` contendo as siglas e nomes dos estados bra
 
 ```{r}
 uf <-
-  gs_key('1bTIcFLpnOefYs_BaegPC59kbF3gEugOXpYpnfyrDsDQ') %>% 
-  gs_read_csv(verbose = FALSE)
+  googlesheets::gs_key('1bTIcFLpnOefYs_BaegPC59kbF3gEugOXpYpnfyrDsDQ') %>% 
+  googlesheets::gs_read_csv(verbose = FALSE)
 save(uf, file = '../data/r/uf.rda')
 ```
 
