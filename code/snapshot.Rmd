@@ -42,10 +42,6 @@ do ___febr___ no GitHub em https://github.com/febr-team/febr-data/tree/master/da
 
 ```{r}
 library(magrittr)
-library(dplyr)
-library(googlesheets)
-library(sf)
-library(febr)
 ```
 
 ## Tabelas _observacao_
@@ -57,7 +53,7 @@ harmonização.
 
 ```{r}
 vars <- "taxon_"
-observacao <- observation(
+observacao <- febr::observation(
   dataset = "all", 
   variable = vars, 
   stack = TRUE, 
@@ -74,8 +70,8 @@ Para os três sistemas de classificação taxonômica do solo, o processamento d
 
 1. Fusão das colunas com a classificação taxonômica do solo nas diferentes versões de um mesmo sistema de 
    classificação taxonômica. Prioridade é dada à classificação mais recente. No caso do Sistema Brasileiro de
-   Classificação do Solo, `sibcs`, classificações anteriores a 1999 são ignoradas, pois a nomenclatura 
-   utilizada é muito diferente da nomenclatura atual. Nesse caso, observações apenas com a classificação
+   Classificação do Solo, `sibcs`, classificações até 1999 são ignoradas, pois o número de classes e a
+   nomenclatura utilizada são diferentes da versão atual. Nesse caso, observações apenas com a classificação
    taxonômica antiga do `sibcs` ficam sem dados (`NA_character`). Os códigos de identificação das colunas
    resultantes da fusão das colunas de cada um dos três sistema de classificação taxonômica são `taxon_sibcs`,
    `taxon_st` e `taxon_wrb`.
@@ -101,8 +97,8 @@ O tipo de dados das colunas também é definido aqui:
 ```{r}
 sibcs_tabela <- 
   "1yJ_XnsJhnhJSfC3WRimfu_3_owXxpfSKaoxCiMD2_Z0" %>% 
-  gs_key %>% 
-  gs_read_csv()
+  googlesheets::gs_key() %>% 
+  googlesheets::gs_read_csv()
 sibcs_siglas <- sibcs_tabela$campo_codigo
 sibcs_tabela <- as.list(sibcs_tabela$campo_nome)
 names(sibcs_tabela) <- sibcs_siglas
@@ -121,19 +117,21 @@ pruneStrings <-
   }
 observacao <- 
   observacao %>% 
-  mutate(
+  dplyr::mutate(
     taxon_sibcs = dplyr::coalesce(
-      taxon_sibcs_2013, taxon_sibcs_2009, taxon_sibcs_2006, taxon_sibcs_2003, taxon_sibcs_1999),
+      taxon_sibcs_2013, taxon_sibcs_2009, taxon_sibcs_2006, taxon_sibcs_2003),
+      # taxon_sibcs_1999,
       # taxon_sibcs_19xx, taxon_sibcs_xxx, taxon_sibcs_xxx_1, taxon_sibcs_xxx_2, taxon_sibcs_xxxx),
     taxon_sibcs = dplyr::recode(.data$taxon_sibcs, !!!sibcs_tabela),
     taxon_sibcs = pruneStrings(taxon_sibcs, n = 2),
     taxon_sibcs = toupper(taxon_sibcs),
     taxon_sibcs = gsub(pattern = ".", "", .data$taxon_sibcs, fixed = TRUE),
     taxon_sibcs = chartr("áéíóúÁÉÍÓÚ", "aeiouAEIOU", .data$taxon_sibcs),
-    taxon_st = coalesce(taxon_st_2010, taxon_st_1999, taxon_st_xxx),
+    taxon_sibcs = chartr("âêîôûÂÊÎÔÛ", "aeiouAEIOU", .data$taxon_sibcs),
+    taxon_st = dplyr::coalesce(taxon_st_2010, taxon_st_1999, taxon_st_xxx),
     taxon_st = toupper(taxon_st),
     taxon_st = gsub(pattern = ".", "", .data$taxon_st, fixed = TRUE),
-    taxon_wrb = coalesce(taxon_wrb_2006, taxon_wrb_1998, taxon_wrb_xxx),
+    taxon_wrb = dplyr::coalesce(taxon_wrb_2006, taxon_wrb_1998, taxon_wrb_xxx),
     taxon_wrb = toupper(taxon_wrb),
     taxon_wrb = gsub(pattern = ".", "", .data$taxon_wrb, fixed = TRUE),
     coord_precisao = as.numeric(coord_precisao),
@@ -163,7 +161,7 @@ mess(observacao)
 ```{r}
 tmp <-
   observacao %>% 
-  summarise(
+  dplyr::summarise(
     Total = n(),
     `Lat/Long` = sum(!is.na(coord_x)),
     Precisão = median(coord_precisao, na.rm = TRUE),
@@ -188,17 +186,19 @@ tmp <-
 idx <- match(br$SigUF, names(tmp))
 dens <- tmp[idx] / br$area
 dens <- dens[order(dens)]
-# png("../res/febr-observacao-espaco.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+png("../res/fig/febr-observacao-espaco.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 plot(
   br[1], graticule = TRUE, axes = TRUE, 
-  sub = Sys.Date(), main = "Distribuição espacial das observações", 
-  col = 0, xlab = "Longitude", ylab = "Longitude", reset = FALSE)
+  sub = Sys.Date(), 
+  # main = "Distribuição espacial das observações", 
+  main = "Spatial distribution of observations",
+  col = 0, reset = FALSE)
 observacao %>% 
-  filter(!is.na(coord_x) | !is.na(coord_y)) %>% 
-  st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4326) %>%
+  dplyr::filter(!is.na(coord_x) | !is.na(coord_y)) %>% 
+  sf::st_as_sf(coords = c('coord_x', 'coord_y'), crs = 4326) %>%
   dplyr::select(pais_id) %>% 
   plot(cex = 0.5, col = "firebrick1", add = TRUE)
-# dev.off()
+dev.off()
 ```
 
 ```{r}
@@ -223,20 +223,29 @@ de observação, refletindo o histórico de ocupação do território brasileiro
 e pesquisa via universidades e centros de pesquisa agronômica.
 
 ```{r}
+png("../res/fig/febr-observacao-uf.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 layout(matrix(1:2, nrow = 1), widths = c(2, 2), heights = 1, respect = FALSE)
 par(oma = c(0, 0, 1, 0), las = 1)
 tmp %>% 
   sort() %>% 
   barplot(
-    col = "firebrick1", border = "firebrick1", horiz = TRUE, ann = FALSE,
-    ylab = "Unidade da federação", xlab = "Número de observações")
+    col = "firebrick1", border = "firebrick1", 
+    # ylab = "Unidade da federação", xlab = "Número",
+    ylab = "Federative unit", xlab = "Number",
+    horiz = TRUE, ann = FALSE)
 grid()
 dens %>% 
   barplot(
-    col = "firebrick1", border = "firebrick1", horiz = TRUE, ann = FALSE,
-    ylab = "Unidade da federação", xlab = "Densidade de observações (por 1000 km²)")
-title(main = "Distribuição das observações pelas unidades da federação", sub = Sys.Date(), outer = TRUE)
+    col = "firebrick1", border = "firebrick1",
+    # ylab = "Unidade da federação", xlab = "Densidade (por 1000 km²)", 
+    ylab = "Federative unit", xlab = "Density (per 1000 km²)", 
+    horiz = TRUE, ann = FALSE)
+title(
+  # main = "Distribuição das observações pelas unidades da federação", 
+  main = "Observations by federative unit", 
+  sub = Sys.Date(), outer = TRUE)
 grid()
+dev.off()
 ```
 
 Das observações sem coordenadas espaciais (14664 - 11580 = 3084), a maioria se encontra nos estados da Bahia
@@ -245,6 +254,7 @@ dessas observações -- ctb0657, ctb0831 e ctb0775 --, cada um com mais de 100 o
 espaciais. Outros 14 conjuntos de dados possuem entre 50 e 100 observações sem coordenadas espaciais.
 
 ```{r}
+png("../res/fig/febr-observacao-sem-coordenadas.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 layout(matrix(1:2, nrow = 1), widths = c(2, 2), heights = 1, respect = FALSE)
 par(oma = c(0, 0, 1, 0), las = 1)
 observacao %>% 
@@ -254,8 +264,10 @@ observacao %>%
   table() %>% 
   sort() %>% 
   barplot(
-    col = "firebrick1", border = "firebrick1", horiz = TRUE,
-    ylab = "Unidade da federação", xlab = "Número de observações")
+    col = "firebrick1", border = "firebrick1",
+    # ylab = "Unidade da federação", xlab = "Número de observações", 
+    ylab = "Federative unit", xlab = "Number", 
+    horiz = TRUE)
 grid()
 observacao %>% 
   dplyr::filter(is.na(coord_x)) %>% 
@@ -266,18 +278,24 @@ observacao %>%
   head(27L) %>% 
   sort() %>% 
   barplot(
-    col = "firebrick1", border = "firebrick1", horiz = TRUE,
+    col = "firebrick1", border = "firebrick1",
     names.arg = gsub("ctb0", "", names(.)),
-    ylab = "Conjunto de dados", xlab = "Número de observações")
+    # ylab = "Conjunto de dados", xlab = "Número de observações",
+    ylab = "Dataset ID", xlab = "Number",
+    horiz = TRUE)
 grid()
-title(main = "Distribuição das observações sem coordenadas espaciais", sub = Sys.Date(), outer = TRUE)
+title(
+  # main = "Distribuição das observações sem coordenadas espaciais", 
+  main = "Observations without spatial coordinates", 
+  sub = Sys.Date(), outer = TRUE)
+dev.off()
 ```
 
 ```{r}
 observacao %>% 
-  mutate(observacao_data = as.Date(observacao_data) %>% format("%Y")) %>% 
-  summarise(
-    Total = n(),
+  dplyr::mutate(observacao_data = as.Date(observacao_data) %>% format("%Y")) %>% 
+  dplyr::summarise(
+    Total = dplyr::n(),
     Data = sum(!is.na(observacao_data)),
     `<1960` = sum(observacao_data < 1960, na.rm = TRUE),
     `1960-1990` = (sum(observacao_data < 1990, na.rm = TRUE) - `<1960`),
@@ -311,7 +329,7 @@ observacao[!is.na(observacao$coord_x), c("coord_x", "coord_y", "observacao_data"
 ```
 
 ```{r}
-# png("../res/febr-observacao-tempo.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+png("../res/fig/febr-observacao-tempo.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 tmp <- 
   observacao$observacao_data %>%
   as.Date() %>% 
@@ -320,9 +338,14 @@ tmp <-
 barplot(tmp, col = "firebrick1", border = "firebrick1")
 grid()
 barplot(
-  tmp, col = "firebrick1", border = "firebrick1", add = TRUE, xlab = "Ano", ylab = "Número de observações",
-  main = "Distribuição temporal das observações", sub = glue::glue("Versão {Sys.Date()}"))
-# dev.off()
+  tmp, col = "firebrick1", border = "firebrick1",
+  # sub = glue::glue("Versão {Sys.Date()}"),
+  # xlab = "Ano", ylab = "Número de observações",
+  xlab = "Year", ylab = "Number",
+  # main = "Distribuição temporal das observações", 
+  main = "Temporal distribution of observations", 
+  add = TRUE)
+dev.off()
 ```
 
 A maioria das observações com data de observação desconhecida pertencem a conjuntos de dados que abrangem os
@@ -331,6 +354,7 @@ dados se destacam pelo grande número de observações sem coordenadas. São ele
 ctb0657, na Bahia, e ctb831, no Paraná.
 
 ```{r}
+png("../res/fig/febr-observacao-sem-data.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
 layout(matrix(1:2, nrow = 1), widths = c(2, 2), heights = 1, respect = FALSE)
 par(oma = c(0, 0, 1, 0), las = 1)
 observacao %>% 
@@ -340,8 +364,10 @@ observacao %>%
   table() %>% 
   sort() %>% 
   barplot(
-    col = "firebrick1", border = "firebrick1", horiz = TRUE,
-    ylab = "Unidade da federação", xlab = "Número de observações")
+    col = "firebrick1", border = "firebrick1", 
+    # ylab = "Unidade da federação", xlab = "Número de observações",
+    ylab = "Federative unit", xlab = "Number",
+    horiz = TRUE)
 grid()
 observacao %>% 
   dplyr::filter(is.na(observacao_data)) %>% 
@@ -352,13 +378,18 @@ observacao %>%
   head(27L) %>% 
   sort() %>% 
   barplot(
-    col = "firebrick1", border = "firebrick1", horiz = TRUE,
+    col = "firebrick1", border = "firebrick1",
     names.arg = gsub("ctb0", "", names(.)),
-    ylab = "Conjunto de dados", xlab = "Número de observações")
+    # ylab = "Conjunto de dados", xlab = "Número de observações",
+    ylab = "Dataset ID", xlab = "Number",
+    horiz = TRUE)
 grid()
-title(main = "Distribuição das observações com data desconhecida", sub = Sys.Date(), outer = TRUE)
+title(
+  # main = "Distribuição das observações com data desconhecida", 
+  main = "Observations without temporal coordinate", 
+  sub = Sys.Date(), outer = TRUE)
+dev.off()
 ```
-
 
 ### Salvar dados
 
@@ -366,7 +397,7 @@ Salvar os dados no formato CSV.
 
 ```{r}
 write.table(
-  observacao, file = glue::glue("../data/febr-observacao.csv"), sep = ";", dec = ",", row.names = FALSE)
+  observacao, file = glue::glue("../data/febr-observacao.csv"), sep = ",", dec = ",", row.names = FALSE)
 ```
 
 ## Tabelas _camada_
@@ -374,7 +405,7 @@ write.table(
 ```{r}
 vars <- c(
   "carbono",
-  "argila", "areia", "areiagrossa", "areiafina", "silte",
+  "argila", "areia", "areiagrossa2", "areiafina2", "silte",
   "terrafina", "cascalho", "calhaus",
   "dsi",
   "ctc",
@@ -395,9 +426,20 @@ camada <- febr::layer(
     transition = "smooth",
     smoothing.fun = "mean",
     units = TRUE, round = TRUE))
+# camada %>%
+#   lapply(function (x) {
+#     classe <-
+
+#       x %>%
+#       dplyr::select(dplyr::starts_with("ph_h2o")) %>%
+#       unlist() %>%
+#       class()
+#     c(dataset = x$dataset_id[1], classe = classe)
+#   }) %>%
+#   do.call(rbind, .)
 ```
 
-### Processamento dos dados
+### Processamento
 
 O processamento dos dados das variáveis prioritárias das tabelas `camada` segue os seguintes passos:
 
@@ -411,8 +453,8 @@ camada %<>%
     argila = dplyr::coalesce(argila_naoh, argila_xxx),
     silte = dplyr::coalesce(silte_naoh, silte_xxx),
     areia = dplyr::coalesce(areia_naoh, areia_xxx),
-    areiagrossa = dplyr::coalesce(areiagrossa_naoh, areiagrossa_xxx),
-    areiafina = dplyr::coalesce(areiafina_naoh, areiafina_xxx),
+    areiagrossa = dplyr::coalesce(areiagrossa2_naoh, areiagrossa2_xxx),
+    areiafina = dplyr::coalesce(areiafina2_naoh, areiafina2_xxx),
     ctc = dplyr::coalesce(ctc_soma, ctc_xxx),
     dsi = dplyr::coalesce(dsi_cilindro, dsi_xxx),
     ph = dplyr::coalesce(ph_h2o),
@@ -501,39 +543,96 @@ camada de material orgânico do solo, definida assim como sendo igual a zero cen
 camada %<>% 
   dplyr::select(
     dataset_id, observacao_id, camada_id, amostra_id, camada_nome, profund_sup, profund_inf,
-    terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce)
+    terrafina, argila, silte, areia, carbono, ctc, ph, dsi, ce) %T>% 
+  print()
 ```
+
+### Análise exploratória
 
 Verificar a distribuição empírica dos dados, procurando por insconsistências nos dados.
 
 ```{r}
 png("../res/fig/febr-camada.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+par(oma = c(0, 0, 1, 0), las = 1)
 camada %>% 
+  dplyr::mutate(fragmentos = 1000 - terrafina) %>% 
   dplyr::rename(profund = profund_inf) %>%
+  # dplyr::select(
+  #   'profund\n(cm)' = profund, 
+  #   'carbono\n(g/kg)' = carbono,
+  #   'argila\n(g/kg)' = argila, 
+  #   'areia\n(g/kg)' = areia, 
+  #   'silte\n(g/kg)' = silte, 
+  #   'terrafina\n(g/kg)' = terrafina, 
+  #   'dsi\n(kg/dm³)' = dsi, 
+  #   'ctc\n(cmolc/kg)' = ctc,
+  #   'ph\n(-)' = ph,
+  #   'ce\n(mS/cm)' = ce) %>% 
   dplyr::select(
-    'profund\n(cm)' = profund, 
-    'carbono\n(g/kg)' = carbono,
-    'argila\n(g/kg)' = argila, 
-    'areia\n(g/kg)' = areia, 
-    'silte\n(g/kg)' = silte, 
-    'terrafina\n(g/kg)' = terrafina, 
-    'dsi\n(kg/dm³)' = dsi, 
-    'ctc\n(cmolc/kg)' = ctc,
-    'ph\n(-)' = ph,
-    'ce\n(mS/cm)' = ce) %>% 
-  plot(cex = 0.5, col = "firebrick", main = glue::glue("{Sys.Date()}-febr-camada"))
+    'Depth\n(cm)' = profund, 
+    'Carbon\n(g/kg)' = carbono,
+    'Clay\n(g/kg)' = argila, 
+    'Sand\n(g/kg)' = areia, 
+    'Silt\n(g/kg)' = silte, 
+    'Coarse\n(g/kg)' = fragmentos, 
+    'BD\n(kg/dm³)' = dsi, 
+    'CEC\n(cmolc/kg)' = ctc,
+    'pH\n(-)' = ph,
+    'EC\n(mS/cm)' = ce) %>%
+  plot(
+    cex = 0.5, col = "firebrick1", 
+    main = "Empirical data distribuion",
+    sub = glue::glue("{Sys.Date()}-febr-camada"))
 dev.off()
 ```
+
+```{r}
+png("../res/fig/febr-camada-200cm.png", width = 480 * 2, height = 480 * 2, res = 72 * 2)
+par(oma = c(0, 0, 1, 0), las = 1)
+camada %>% 
+  dplyr::mutate(fragmentos = 1000 - terrafina) %>% 
+  dplyr::rename(profund = profund_inf) %>%
+  dplyr::filter(profund <= 200) %>% 
+  # dplyr::select(
+  #   'profund\n(cm)' = profund, 
+  #   'carbono\n(g/kg)' = carbono,
+  #   'argila\n(g/kg)' = argila, 
+  #   'areia\n(g/kg)' = areia, 
+  #   'silte\n(g/kg)' = silte, 
+  #   'terrafina\n(g/kg)' = terrafina, 
+  #   'dsi\n(kg/dm³)' = dsi, 
+  #   'ctc\n(cmolc/kg)' = ctc,
+  #   'ph\n(-)' = ph,
+  #   'ce\n(mS/cm)' = ce) %>% 
+  dplyr::select(
+    'Depth\n(cm)' = profund, 
+    'Carbon\n(g/kg)' = carbono,
+    'Clay\n(g/kg)' = argila, 
+    'Sand\n(g/kg)' = areia, 
+    'Silt\n(g/kg)' = silte, 
+    'Coarse\n(g/kg)' = fragmentos, 
+    'BD\n(kg/dm³)' = dsi, 
+    'CEC\n(cmolc/kg)' = ctc,
+    'pH\n(-)' = ph,
+    'EC\n(mS/cm)' = ce) %>%
+  plot(
+    cex = 0.5, col = "firebrick1",
+    main = "Empirical data distribuion (< 200 cm)",
+    sub = glue::glue("{Sys.Date()}-febr-camada"))
+dev.off()
+```
+
+### Salvar dados
 
 Salvar os dados no formato CSV.
 
 ```{r}
-write.table(camada, file = glue::glue("../data/febr-camada.csv"), sep = ";", dec = ",", row.names = FALSE)
+write.table(camada, file = glue::glue("../data/febr-camada.csv"), sep = ",", dec = ",", row.names = FALSE)
 ```
 
 ## Tabelas `observacao` + `camada`
 
 ```{r}
 febr <- merge(observacao, camada, by = c("dataset_id", "observacao_id"))
-write.table(febr, file = "../data/febr-superconjunto.csv", sep = ";", dec = ",", row.names = FALSE)
+write.table(febr, file = "../data/febr-superconjunto.csv", sep = ",", dec = ",", row.names = FALSE)
 ```
