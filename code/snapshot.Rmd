@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.asp = 1)
+library(magrittr)
 ```
 
 ## Apresentação
@@ -429,9 +430,8 @@ camada <- febr::layer(
 # camada %>%
 #   lapply(function (x) {
 #     classe <-
-
 #       x %>%
-#       dplyr::select(dplyr::starts_with("ph_h2o")) %>%
+#       dplyr::select(dplyr::starts_with("terrafina")) %>%
 #       unlist() %>%
 #       class()
 #     c(dataset = x$dataset_id[1], classe = classe)
