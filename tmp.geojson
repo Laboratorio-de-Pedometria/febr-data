@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "tmp",
+"description": "Isso é um teste",
+"bbox": [ 25, 15, 25, 15 ],                                                                                                        
+"features": [
+{ "type": "Feature", "properties": { "id": "perfil 1", "carbono": { "A": 15, "E": 1, "B": 19 } }, "bbox": [ 25.0, 15.0, 25.0, 15.0 ], "geometry": { "type": "Point", "coordinates": [ 25.0, 15.0 ] } }
+]
+}
