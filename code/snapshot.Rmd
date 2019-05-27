@@ -41,8 +41,40 @@ harmonização estão descritos na página do pacote `febr` para o R em https://
 Depois de processados, os dados são disponibilizados ao público usando o formato universal CSV no repositório 
 do ___febr___ no GitHub em https://github.com/febr-team/febr-data/tree/master/data.
 
+## Tabelas _dataset_
+
 ```{r}
-library(magrittr)
+datasets <- febr::dataset(dataset = 'all')
+```
+
+```{r}
+dts_rows <- 
+  c("dataset_id", "dataset_titulo", "dataset_licenca", "dataset_versao", "publicacao_data", "palavras_chave")
+datasets <- 
+  sapply(datasets, function (x) {
+    i1 <- match(dts_rows, x[[1]])
+    x1 <- x[i1, 2]
+    
+    # Manter apenas a primeira área do conhecimento
+    i2 <- match("area_conhecimento", x[[1]])
+    x2 <- x[i2, 2] %>% stringr::str_split_fixed(pattern = ";", n = Inf)
+    
+    # Manter apenas o primeiro autor
+    i3 <- match("autor_nome", x[[1]])
+    x3 <- x[i3, 2] %>% stringr::str_split_fixed(pattern = ";", n = Inf)
+    
+    # Manter apenas a primeira instituição
+    i4 <- match("organizacao_nome", x[[1]])
+    x4 <- x[i4, 2] %>% stringr::str_split_fixed(pattern = ";", n = Inf)
+    
+    c(x1, x2[1], x3[1], x4[1])
+  })
+datasets <- t(datasets) %>% data.frame()
+colnames(datasets) <- c(dts_rows, "area_conhecimento", "autor_nome", "organizacao_nome")
+col_order <- 
+  c("dataset_id", "dataset_titulo", "autor_nome", "organizacao_nome", "dataset_licenca", "dataset_versao",
+    "publicacao_data", "palavras_chave", "area_conhecimento")
+datasets <- datasets[col_order]
 ```
 
 ## Tabelas _observacao_
