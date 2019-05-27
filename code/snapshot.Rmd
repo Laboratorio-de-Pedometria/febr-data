@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.asp = 1)
+library(dplyr)
 library(magrittr)
 ```
 
@@ -44,14 +45,14 @@ do ___febr___ no GitHub em https://github.com/febr-team/febr-data/tree/master/da
 ## Tabelas _dataset_
 
 ```{r}
-datasets <- febr::dataset(dataset = 'all')
+dataset <- febr::dataset(dataset = 'all')
 ```
 
 ```{r}
 dts_rows <- 
   c("dataset_id", "dataset_titulo", "dataset_licenca", "dataset_versao", "publicacao_data", "palavras_chave")
-datasets <- 
-  sapply(datasets, function (x) {
+dataset <- 
+  sapply(dataset, function (x) {
     i1 <- match(dts_rows, x[[1]])
     x1 <- x[i1, 2]
     
@@ -69,12 +70,30 @@ datasets <-
     
     c(x1, x2[1], x3[1], x4[1])
   })
-datasets <- t(datasets) %>% data.frame()
-colnames(datasets) <- c(dts_rows, "area_conhecimento", "autor_nome", "organizacao_nome")
+dataset <- t(dataset) %>% data.frame()
+colnames(dataset) <- c(dts_rows, "area_conhecimento", "autor_nome", "organizacao_nome")
 col_order <- 
   c("dataset_id", "dataset_titulo", "autor_nome", "organizacao_nome", "dataset_licenca", "dataset_versao",
     "publicacao_data", "palavras_chave", "area_conhecimento")
-datasets <- datasets[col_order]
+dataset <- dataset[col_order]
+# Alterar licença dos conjuntos de dados da Embrapa
+dataset %<>%
+  mutate(
+    dataset_id = as.character(dataset_id),
+    tmp = gsub("ctb", "", dataset_id),
+    tmp = as.integer(tmp),
+    dataset_licenca = as.character(dataset_licenca),
+    dataset_licenca = ifelse(tmp > 100, "CC BY-NC 4.0", dataset_licenca)
+  ) %>% 
+  select(-tmp)
+```
+
+### Salvar dados
+
+Salvar os dados no formato TXT.
+
+```{r}
+write.table(dataset, file = glue::glue("../data/febr-dataset.txt"), sep = ";", dec = ",", row.names = FALSE)
 ```
 
 ## Tabelas _observacao_
@@ -662,10 +681,12 @@ Salvar os dados no formato TXT.
 write.table(camada, file = glue::glue("../data/febr-camada.txt"), sep = ";", dec = ",", row.names = FALSE)
 ```
 
-## Tabelas `observacao` + `camada`
+## Tabelas _dataset_ + _observacao_ + _camada_
 
 ```{r}
-febr <- merge(observacao, camada, by = c("dataset_id", "observacao_id"))
+febr <- 
+  merge(dataset, observacao, by = "dataset_id") %>% 
+  merge(camada, by = c("dataset_id", "observacao_id"))
 ```
 
 ### Salvar dados
