@@ -74,6 +74,10 @@ dataset <-
   })
 dataset <- t(dataset) %>% data.frame()
 colnames(dataset) <- c(dts_rows, "area_conhecimento", "autor_nome", "organizacao_nome")
+
+# remover espaços duplos no título
+dataset$dataset_titulo <- gsub(pattern = '  ', replacement = ' ', x = dataset$dataset_titulo)
+
 col_order <- 
   c("dataset_id", "dataset_titulo", "autor_nome", "organizacao_nome", "dataset_licenca", "dataset_versao",
     "publicacao_data", "palavras_chave", "area_conhecimento")
