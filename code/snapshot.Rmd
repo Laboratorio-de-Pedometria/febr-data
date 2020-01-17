@@ -529,7 +529,7 @@ write.table(
 vars <- c(
   "carbono",
   "argila", "areia", "areiagrossa2", "areiafina2", "silte",
-  "terrafina", "cascalho", "calhaus",
+  "terrafina", "cascalho", "calhau",
   "dsi",
   "ctc",
   "ph",
@@ -583,7 +583,7 @@ camada %<>%
     terrafina = dplyr::coalesce(terrafina_peneira, terrafina_xxx),
     ce = dplyr::coalesce(ce_pastasat),
     cascalho = dplyr::coalesce(cascalho_peneira, cascalho_olho, cascalho_xxx),
-    calhau = dplyr::coalesce(calhaus_peneira, calhaus_xxx)
+    calhau = dplyr::coalesce(calhau_peneira, calhau_xxx)
   ) %T>% 
   print()
 ```
@@ -679,31 +679,32 @@ par(oma = c(0, 0, 1, 0), las = 1)
 camada %>% 
   dplyr::mutate(fragmentos = 1000 - terrafina) %>% 
   dplyr::rename(profund = profund_inf) %>%
-  # dplyr::select(
-  #   'profund\n(cm)' = profund, 
-  #   'carbono\n(g/kg)' = carbono,
-  #   'argila\n(g/kg)' = argila, 
-  #   'areia\n(g/kg)' = areia, 
-  #   'silte\n(g/kg)' = silte, 
-  #   'terrafina\n(g/kg)' = terrafina, 
-  #   'dsi\n(kg/dm³)' = dsi, 
-  #   'ctc\n(cmolc/kg)' = ctc,
-  #   'ph\n(-)' = ph,
-  #   'ce\n(mS/cm)' = ce) %>% 
   dplyr::select(
-    'Depth\n(cm)' = profund, 
-    'Carbon\n(g/kg)' = carbono,
-    'Clay\n(g/kg)' = argila, 
-    'Sand\n(g/kg)' = areia, 
-    'Silt\n(g/kg)' = silte, 
-    'Coarse\n(g/kg)' = fragmentos, 
-    'BD\n(kg/dm³)' = dsi, 
-    'CEC\n(cmolc/kg)' = ctc,
-    'pH\n(-)' = ph,
-    'EC\n(mS/cm)' = ce) %>%
+    'profund\n(cm)' = profund,
+    'carbono\n(g/kg)' = carbono,
+    'argila\n(g/kg)' = argila,
+    'areia\n(g/kg)' = areia,
+    'silte\n(g/kg)' = silte,
+    'terrafina\n(g/kg)' = terrafina,
+    'dsi\n(kg/dm³)' = dsi,
+    'ctc\n(cmolc/kg)' = ctc,
+    'ph\n(-)' = ph,
+    'ce\n(mS/cm)' = ce) %>%
+  # dplyr::select(
+  #   'Depth\n(cm)' = profund, 
+  #   'Carbon\n(g/kg)' = carbono,
+  #   'Clay\n(g/kg)' = argila, 
+  #   'Sand\n(g/kg)' = areia, 
+  #   'Silt\n(g/kg)' = silte, 
+  #   'Coarse\n(g/kg)' = fragmentos, 
+  #   'BD\n(kg/dm³)' = dsi, 
+  #   'CEC\n(cmolc/kg)' = ctc,
+  #   'pH\n(-)' = ph,
+  #   'EC\n(mS/cm)' = ce) %>%
   plot(
     cex = 0.5, col = "firebrick1", 
-    main = "Empirical data distribuion",
+    main = "Distribuição empírica dos dados",
+    # main = "Empirical data distribuion",
     sub = glue::glue("{Sys.Date()}-febr-camada"))
 dev.off()
 ```
@@ -715,31 +716,32 @@ camada %>%
   dplyr::mutate(fragmentos = 1000 - terrafina) %>% 
   dplyr::rename(profund = profund_inf) %>%
   dplyr::filter(profund <= 200) %>% 
-  # dplyr::select(
-  #   'profund\n(cm)' = profund, 
-  #   'carbono\n(g/kg)' = carbono,
-  #   'argila\n(g/kg)' = argila, 
-  #   'areia\n(g/kg)' = areia, 
-  #   'silte\n(g/kg)' = silte, 
-  #   'terrafina\n(g/kg)' = terrafina, 
-  #   'dsi\n(kg/dm³)' = dsi, 
-  #   'ctc\n(cmolc/kg)' = ctc,
-  #   'ph\n(-)' = ph,
-  #   'ce\n(mS/cm)' = ce) %>% 
   dplyr::select(
-    'Depth\n(cm)' = profund, 
-    'Carbon\n(g/kg)' = carbono,
-    'Clay\n(g/kg)' = argila, 
-    'Sand\n(g/kg)' = areia, 
-    'Silt\n(g/kg)' = silte, 
-    'Coarse\n(g/kg)' = fragmentos, 
-    'BD\n(kg/dm³)' = dsi, 
-    'CEC\n(cmolc/kg)' = ctc,
-    'pH\n(-)' = ph,
-    'EC\n(mS/cm)' = ce) %>%
+    'profund\n(cm)' = profund,
+    'carbono\n(g/kg)' = carbono,
+    'argila\n(g/kg)' = argila,
+    'areia\n(g/kg)' = areia,
+    'silte\n(g/kg)' = silte,
+    'terrafina\n(g/kg)' = terrafina,
+    'dsi\n(kg/dm³)' = dsi,
+    'ctc\n(cmolc/kg)' = ctc,
+    'ph\n(-)' = ph,
+    'ce\n(mS/cm)' = ce) %>%
+  # dplyr::select(
+  #   'Depth\n(cm)' = profund, 
+  #   'Carbon\n(g/kg)' = carbono,
+  #   'Clay\n(g/kg)' = argila, 
+  #   'Sand\n(g/kg)' = areia, 
+  #   'Silt\n(g/kg)' = silte, 
+  #   'Coarse\n(g/kg)' = fragmentos, 
+  #   'BD\n(kg/dm³)' = dsi, 
+  #   'CEC\n(cmolc/kg)' = ctc,
+  #   'pH\n(-)' = ph,
+  #   'EC\n(mS/cm)' = ce) %>%
   plot(
     cex = 0.5, col = "firebrick1",
-    main = "Empirical data distribuion (< 200 cm)",
+    main = "Distribuição empírica dos dados (< 200 cm)",
+    # main = "Empirical data distribuion (< 200 cm)",
     sub = glue::glue("{Sys.Date()}-febr-camada"))
 dev.off()
 ```
