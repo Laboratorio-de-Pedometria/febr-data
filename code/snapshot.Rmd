@@ -46,6 +46,8 @@ do ___febr___ no GitHub em https://github.com/febr-team/febr-data/tree/master/da
 
 ```{r}
 dataset <- febr::dataset(dataset = 'all')
+# str(dataset, 1)
+# sapply(dataset, colnames)
 ```
 
 ```{r}
@@ -77,15 +79,15 @@ col_order <-
     "publicacao_data", "palavras_chave", "area_conhecimento")
 dataset <- dataset[col_order]
 # Alterar licença dos conjuntos de dados da Embrapa
-dataset %<>%
-  mutate(
-    dataset_id = as.character(dataset_id),
-    tmp = gsub("ctb", "", dataset_id),
-    tmp = as.integer(tmp),
-    dataset_licenca = as.character(dataset_licenca),
-    dataset_licenca = ifelse(tmp > 100, "CC BY-NC 4.0", dataset_licenca)
-  ) %>% 
-  select(-tmp)
+# dataset %<>%
+#   mutate(
+#     dataset_id = as.character(dataset_id),
+#     tmp = gsub("ctb", "", dataset_id),
+#     tmp = as.integer(tmp),
+#     dataset_licenca = as.character(dataset_licenca),
+#     dataset_licenca = ifelse(tmp > 100, "CC BY-NC 4.0", dataset_licenca)
+#   ) %>% 
+#   select(-tmp)
 ```
 
 ### Salvar dados
